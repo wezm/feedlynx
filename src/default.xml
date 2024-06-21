@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-US">
+  <!-- atom:feed elements MUST contain exactly one atom:id element. -->
+  <id>tag:github.com,2008:https://github.com/wezm/rsspls/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/wezm/rsspls/releases"/>
+  <!-- atom:feed elements SHOULD contain one atom:link element with a rel
+      attribute value of "self".  This is the preferred URI for
+  retrieving Atom Feed Documents representing this Atom feed. -->
+  <link type="application/atom+xml" rel="self" href="https://github.com/wezm/rsspls/releases.atom"/>
+  <!-- atom:feed elements MUST contain exactly one atom:title element. -->
+  <title>Watch Later</title>
+  <!-- atom:feed elements MUST contain exactly one atom:updated element. -->
+  <updated>2024-03-07T09:44:23Z</updated>
+  <!-- atom:feed elements MUST contain one or more atom:author elements,
+      unless all of the atom:feed element's child atom:entry elements
+  contain at least one atom:author element. -->
+</feed>
