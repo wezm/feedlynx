@@ -1,0 +1,12 @@
+[package]
+name = "vidlater"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+atom_syndication = { version = "0.12.3", default-features = false }
+chrono = { version = "0.4.38", default-features = false, features = ["now","std"] }
+form_urlencoded = "1.2.1"
+#serde = { version = "1.0.203", features = ["derive"] }
+tiny_http = "0.12.0"
+uriparse = "0.6.4"
