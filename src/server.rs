@@ -65,7 +65,7 @@ impl Server {
                             continue;
                         }
                         Err(err) => {
-                            println!("unable to open file: {}", err);
+                            error!("unable to open feed file: {}", err);
                             Response::from_string(embed!("500.html")).with_status_code(500)
                         }
                     }
@@ -101,10 +101,12 @@ impl Server {
         // Parse the form submission and extract the token and url
         let mut token = None;
         let mut url = None;
+        let mut title = None;
 
         form_urlencoded::parse(&body).for_each(|(key, value)| match &*key {
             "token" => token = Some(value),
             "url" => url = Some(value),
+            "title" => title = Some(value),
             _ => {}
         });
 
@@ -122,7 +124,7 @@ impl Server {
 
         // Add to the feed
         let mut feed = Feed::new(&self.feed_path).expect("FIXME");
-        feed.add_url(&url);
+        feed.add_url(&url, title.unwrap_or(Cow::from("Untitled")).into_owned());
         match feed.save() {
             Ok(()) => Ok(()),
             Err(err) => {

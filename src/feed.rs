@@ -38,7 +38,7 @@ impl Feed {
         feed
     }
 
-    pub fn add_url(&mut self, url: &URI) {
+    pub fn add_url(&mut self, url: &URI, title: String) {
         info!("Add {}", url);
         let now: DateTime<Utc> = Utc::now();
 
@@ -49,8 +49,8 @@ impl Feed {
             ..Default::default()
         };
         let entry = atom::Entry {
-            title: "Title".into(), // FIXME: pull from POST body
-            id: format!("{}", url),
+            title: title.into(),
+            id: format!("{}", url), // FIXME: proper id
             updated: now.into(),
             summary: Some(summary_for_url(url)),
             links: vec![link],
@@ -58,18 +58,8 @@ impl Feed {
             ..Default::default()
         };
         self.feed.entries.push(entry);
-
-        // Write
         self.set_generator();
-
         self.feed.set_updated(now);
-
-        // write to the feed to a writer
-        //feed.write_to(sink()).unwrap();
-
-        // convert the feed to a string
-        let string = self.feed.to_string();
-        println!("{}", string);
     }
 
     pub fn save(&self) -> Result<(), Error> {

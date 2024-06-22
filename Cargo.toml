@@ -11,3 +11,6 @@ form_urlencoded = "1.2.1"
 log = "0.4.21"
 tiny_http = "0.12.0"
 uriparse = "0.6.4"
+
+[profile.release]
+strip = "debuginfo"
