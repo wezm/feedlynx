@@ -5,6 +5,7 @@ mod server;
 
 use std::{fmt, io};
 
+pub use feed::Feed;
 pub use server::Server;
 
 #[derive(Debug)]
@@ -16,6 +17,33 @@ pub enum Error {
 pub struct PrivateToken(pub String);
 
 pub struct FeedToken(pub String);
+
+#[macro_export]
+macro_rules! embed {
+    ($path:literal) => {{
+        #[cfg(debug_assertions)]
+        {
+            use std::{borrow::Cow, fs, path::Path};
+
+            let data = Path::new(file!())
+                .parent()
+                .ok_or_else(|| "no parent".to_string())
+                .map(|parent| parent.join($path))
+                .and_then(|path| fs::read_to_string(&path).map_err(|err| err.to_string()))
+                .map(Cow::<'static, str>::Owned);
+            match data {
+                Ok(data) => data,
+                Err(err) => panic!("unable to embed {}: {}", $path, err),
+            }
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            use std::borrow::Cow;
+
+            Cow::<'static, str>::Borrowed(include_str!($path))
+        }
+    }};
+}
 
 impl PartialEq<str> for PrivateToken {
     fn eq(&self, other: &str) -> bool {

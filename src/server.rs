@@ -1,43 +1,20 @@
 use std::error::Error;
+use std::fs::File;
 use std::net::ToSocketAddrs;
-use std::sync::{Arc, Mutex};
+use std::path::PathBuf;
 
 use tiny_http::{Header, HeaderField, Method, Request, Response, StatusCode};
 use uriparse::URI;
 
-use crate::{FeedToken, PrivateToken};
-
-macro_rules! embed {
-    ($path:literal) => {{
-        #[cfg(debug_assertions)]
-        {
-            use std::{borrow::Cow, fs, path::Path};
-
-            let data = Path::new(file!())
-                .parent()
-                .ok_or_else(|| "no parent".to_string())
-                .map(|parent| parent.join($path))
-                .and_then(|path| fs::read_to_string(&path).map_err(|err| err.to_string()))
-                .map(Cow::<'static, str>::Owned);
-            match data {
-                Ok(data) => data,
-                Err(err) => panic!("unable to embed {}: {}", $path, err),
-            }
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            use std::borrow::Cow;
-
-            Cow::<'static, str>::Borrowed(include_str!($path))
-        }
-    }};
-}
+use crate::feed::Feed;
+use crate::{embed, FeedToken, PrivateToken};
 
 pub struct Server {
     server: tiny_http::Server,
-    //status: Arc<Mutex<DeviceStatuses>>,
     private_token: PrivateToken,
-    feed_token: FeedToken,
+    // feed_token: FeedToken,
+    feed_path: PathBuf,
+    feed_route: String,
 }
 
 impl Server {
@@ -45,7 +22,7 @@ impl Server {
         addr: A,
         private_token: PrivateToken,
         feed_token: FeedToken,
-        //status: Arc<Mutex<DeviceStatuses>>,
+        feed_path: PathBuf,
     ) -> Result<Server, Box<dyn Error + Send + Sync + 'static>>
     where
         A: ToSocketAddrs,
@@ -53,33 +30,46 @@ impl Server {
         tiny_http::Server::http(addr).map(|server| Server {
             server,
             private_token,
-            feed_token,
+            // feed_token,
+            feed_path,
+            feed_route: format!("/feed/{}", feed_token.0),
         })
     }
 
     pub fn handle_requests(&self) {
-        let HTML_CONTENT_TYPE: Header = "Content-type: text/html; charset=utf-8".parse().unwrap();
-        let CSS_CONTENT_TYPE: Header = "Content-type: text/css; charset=utf-8".parse().unwrap();
-        let SVG_CONTENT_TYPE: Header = "Content-type: image/svg+xml".parse().unwrap();
-        let JS_CONTENT_TYPE: Header = "Content-type: text/javascript; charset=utf-8"
-            .parse()
-            .unwrap();
-        let JSON_CONTENT_TYPE: Header = "Content-type: application/json".parse().unwrap();
+        let html_content_type: Header = "Content-type: text/html; charset=utf-8".parse().unwrap();
+        let atom_content_type: Header = "Content-type: application/atom+xml".parse().unwrap();
 
         for mut request in self.server.incoming_requests() {
             let response = match (request.method(), request.url()) {
-                // TODO: Require GET, handle HEAD
                 (Method::Get, "/") => Response::from_string(embed!("index.html"))
-                    .with_header(HTML_CONTENT_TYPE.clone()),
-                (Method::Get, "/feed") => {
-                    todo!()
+                    .with_header(html_content_type.clone()),
+                // TODO: Handle query args (I.e. ignore them?)
+                (Method::Get, path) if path == self.feed_route => {
+                    match File::open(&self.feed_path) {
+                        Ok(file) => {
+                            // TODO: Set cache headers on the response
+                            // TODO: Handle cache headers on the request
+
+                            // This branch has a different response type so we have to call respond and continue
+                            // instead of falling through to the code at the bottom.
+                            let response =
+                                Response::from_file(file).with_header(atom_content_type.clone());
+                            let _ = request.respond(response);
+                            continue;
+                        }
+                        Err(err) => {
+                            println!("unable to open file: {}", err);
+                            Response::from_string(embed!("500.html")).with_status_code(500)
+                        }
+                    }
                 }
                 (Method::Post, "/add") => match self.add(&mut request) {
                     Ok(()) => Response::from_string("Created").with_status_code(201),
                     Err(status) => Response::from_string("Failed").with_status_code(status),
                 },
                 _ => Response::from_string(embed!("404.html"))
-                    .with_header(HTML_CONTENT_TYPE.clone())
+                    .with_header(html_content_type.clone())
                     .with_status_code(404),
             };
 
@@ -117,11 +107,13 @@ impl Server {
         }
 
         // Parse URL
-        let Some(url) = url.as_ref().map(|u| URI::try_from(u.as_ref()).ok()) else {
+        let Some(url) = url.as_ref().and_then(|u| URI::try_from(u.as_ref()).ok()) else {
             return Err(StatusCode::from(400)); // Bad request
         };
 
         // Add to the feed
+        let mut feed = Feed::new("feed.xml").expect("FIXME");
+        feed.add_url(&url);
 
         Ok(())
     }

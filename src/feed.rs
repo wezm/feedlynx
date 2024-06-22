@@ -1,4 +1,5 @@
-use std::io::BufReader;
+use std::fs;
+use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::{borrow::Cow, fs::File};
 
@@ -6,7 +7,7 @@ use atom_syndication::{self as atom, Generator};
 use chrono::{DateTime, Utc};
 use uriparse::URI;
 
-use crate::Error;
+use crate::{embed, Error};
 
 pub struct Feed {
     path: PathBuf,
@@ -24,21 +25,39 @@ impl Feed {
         Ok(Feed { feed, path })
     }
 
+    pub fn empty<P: Into<PathBuf>>(path: P) -> Self {
+        let content = embed!("default.xml");
+        let feed = atom::Feed::read_from(BufReader::new(content.as_bytes()))
+            .expect("default feed is invalid");
+        let mut feed = Feed {
+            feed,
+            path: path.into(),
+        };
+        feed.set_generator();
+        feed
+    }
+
     pub fn add_url(&mut self, url: &URI) {
-        // Write
-        let generator = Generator {
-            value: env!("CARGO_PKG_NAME").to_string(),
-            version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        let now: DateTime<Utc> = Utc::now();
+
+        // Add the new item
+        let summary = atom::Text::html(
+            r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/1162ouPHH3Q" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe> "#,
+        );
+        let entry = atom::Entry {
+            title: "Title".into(),
+            id: format!("{}", url),
+            updated: now.into(),
+            summary: Some(summary),
+            // authors: vec![author],
             ..Default::default()
         };
-        self.feed.set_generator(generator);
+        self.feed.entries.push(entry);
 
-        //let sys_time = SystemTime::now();
-        //let timestamp=sys_time.duration_since(SystemTime::UNIX_EPOCH).unwrap();
-        let local: DateTime<Utc> = Utc::now();
+        // Write
+        self.set_generator();
 
-        //let now = FixedDateTime::from_timestamp(timestamp, 0).unwrap();
-        self.feed.set_updated(local);
+        self.feed.set_updated(now);
 
         // write to the feed to a writer
         //feed.write_to(sink()).unwrap();
@@ -49,30 +68,28 @@ impl Feed {
     }
 
     pub fn save(&self) -> Result<(), Error> {
-        // let cookie_store_path = cookie_store_path()?;
-        // let cookie_store_tmp_path = cookie_store_path.with_extension("tmp");
+        let tmp_path = self.path.with_extension("tmp");
 
-        // // Ensure the directory the cookie file is stored in exists
-        // let config_dir = cookie_store_path.parent().ok_or_else(|| {
-        //     Error::Io(io::Error::new(
-        //         io::ErrorKind::Other,
-        //         "unable to find parent dir of cookie file",
-        //     ))
-        // })?;
+        // Wrap in block so that tmp_file is dropped before calling rename
+        {
+            // Write out the file entirely
+            let tmp_file = File::create(&tmp_path)?;
+            let writer = BufWriter::new(tmp_file);
+            let mut writer = self.feed.write_to(writer)?;
+            writer.flush()?;
+        }
 
-        // if !config_dir.exists() {
-        //     DirBuilder::new().recursive(true).create(config_dir)?;
-        // }
+        // Move into place atomically
+        fs::rename(tmp_path, &self.path).map_err(Error::from)
+    }
 
-        // {
-        //     // Write out the file entirely
-        //     let mut tmp_file = File::create(&cookie_store_tmp_path)?;
-        //     self.http.save_cookies(&mut tmp_file)?;
-        // }
-
-        // // Move into place atomically
-        // fs::rename(cookie_store_tmp_path, cookie_store_path).map_err(Error::from)
-        todo!()
+    fn set_generator(&mut self) {
+        let generator = Generator {
+            value: env!("CARGO_PKG_NAME").to_string(),
+            version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            ..Default::default()
+        };
+        self.feed.set_generator(generator);
     }
 }
 

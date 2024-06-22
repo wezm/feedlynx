@@ -1,9 +1,10 @@
 use std::{
     env::{self, VarError},
-    process,
+    path::PathBuf,
+    process::{self, ExitCode},
 };
 
-use vidlater::{base62::base62, FeedToken, PrivateToken, Server};
+use vidlater::{base62::base62, Feed, FeedToken, PrivateToken, Server};
 
 const ENV_ADDRESS: &str = "VIDLATER_ADDRESS";
 const ENV_PORT: &str = "VIDLATER_PORT";
@@ -17,13 +18,25 @@ struct Config {
     feed_token: FeedToken,
 }
 
-fn main() {
-    if env::args_os()
-        .skip(1)
-        .next()
-        .map_or(false, |arg| arg == "gen-token")
-    {
-        return generate_token();
+fn main() -> ExitCode {
+    let arg = env::args_os().skip(1).next();
+
+    let feed_path = match arg {
+        Some(arg) if arg == "gen-token" => {
+            generate_token();
+            return ExitCode::SUCCESS;
+        }
+        Some(arg) => PathBuf::from(arg),
+        None => {
+            eprintln!("Usage: {} path/to/feed.xml", env!("CARGO_BIN_NAME"));
+            return ExitCode::FAILURE;
+        }
+    };
+
+    // Create the feed file if it does not exist
+    if !feed_path.exists() {
+        let feed = Feed::empty(&feed_path);
+        feed.save().expect("FIXME");
     }
 
     let config = read_config().expect("FIXME: config");
@@ -31,6 +44,7 @@ fn main() {
         (config.addr.clone(), config.port),
         config.private_token,
         config.feed_token,
+        feed_path,
     ) {
         Ok(server) => server,
         Err(err) => {
@@ -47,6 +61,8 @@ fn main() {
         config.addr, config.port
     );
     server.handle_requests();
+
+    ExitCode::SUCCESS
 }
 
 fn read_config() -> Result<Config, String> {
@@ -82,6 +98,5 @@ fn read_token(name: &str) -> Result<String, String> {
 
 /// Generate and print a base62 encoded token
 fn generate_token() {
-    let token = base62::<32>();
-    println!("{token}");
+    println!("{}", base62::<32>());
 }
