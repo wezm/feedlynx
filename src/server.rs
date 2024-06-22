@@ -5,6 +5,8 @@ use std::sync::{Arc, Mutex};
 use tiny_http::{Header, HeaderField, Method, Request, Response, StatusCode};
 use uriparse::URI;
 
+use crate::{FeedToken, PrivateToken};
+
 macro_rules! embed {
     ($path:literal) => {{
         #[cfg(debug_assertions)]
@@ -26,7 +28,7 @@ macro_rules! embed {
         {
             use std::borrow::Cow;
 
-            Cow::<'static, str>::Borrowed(include_str!($path));
+            Cow::<'static, str>::Borrowed(include_str!($path))
         }
     }};
 }
@@ -34,17 +36,25 @@ macro_rules! embed {
 pub struct Server {
     server: tiny_http::Server,
     //status: Arc<Mutex<DeviceStatuses>>,
+    private_token: PrivateToken,
+    feed_token: FeedToken,
 }
 
 impl Server {
     pub fn new<A>(
         addr: A,
+        private_token: PrivateToken,
+        feed_token: FeedToken,
         //status: Arc<Mutex<DeviceStatuses>>,
     ) -> Result<Server, Box<dyn Error + Send + Sync + 'static>>
     where
         A: ToSocketAddrs,
     {
-        tiny_http::Server::http(addr).map(|server| Server { server })
+        tiny_http::Server::http(addr).map(|server| Server {
+            server,
+            private_token,
+            feed_token,
+        })
     }
 
     pub fn handle_requests(&self) {
@@ -115,19 +125,14 @@ impl Server {
         }
     }
 
-    fn add(&self, request: &mut Request) -> StatusCode {
-        let content_type = match Self::validate_request(request) {
-            Ok(headers) => headers,
-            Err(status) => {
-                return status;
-            }
-        };
+    fn add(&self, request: &mut Request) -> Result<(), StatusCode> {
+        Self::validate_request(request)?;
 
         // Get the text field of the form data
         // FIXME: Limit the size of the body that will be read
         let mut body = Vec::new();
         if request.as_reader().read_to_end(&mut body).is_err() {
-            return (StatusCode::from(500));
+            return Err(StatusCode::from(500));
         }
 
         // Parse the form submission and extract the token and url
@@ -147,7 +152,7 @@ impl Server {
 
         // Parse URL
         let Some(url) = url.as_ref().map(|u| URI::try_from(u.as_ref()).ok()) else {
-            return StatusCode::from(400); // Bad request
+            return Err(StatusCode::from(400)); // Bad request
         };
 
         //find(|(key, _value)| key == "text") {
@@ -167,7 +172,7 @@ impl Server {
         //    ),
         //}
 
-        StatusCode::from(201)
+        Ok(())
     }
 
     fn validate_request(request: &Request) -> Result<(), StatusCode> {

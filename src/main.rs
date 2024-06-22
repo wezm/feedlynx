@@ -1,54 +1,42 @@
-use std::fs::File;
-use std::io::BufReader;
-use std::time::SystemTime;
-use std::{env, process};
+use std::{
+    env::{self, VarError},
+    process,
+};
 
-use atom_syndication::{Feed, FixedDateTime, Generator};
-use chrono::{DateTime, FixedOffset, Utc};
+use vidlater::{base62::base62, FeedToken, PrivateToken, Server};
 
-use vidlater::Server;
+const ENV_ADDRESS: &str = "VIDLATER_ADDRESS";
+const ENV_PORT: &str = "VIDLATER_PORT";
+const ENV_PRIVATE_TOKEN: &str = "VIDLATER_PRIVATE_TOKEN";
+const ENV_FEED_TOKEN: &str = "VIDLATER_FEED_TOKEN";
+
+struct Config {
+    addr: String,
+    port: u16,
+    private_token: PrivateToken,
+    feed_token: FeedToken,
+}
 
 fn main() {
-    // Read
-    let file = File::open("src/default.xml").unwrap();
-    let mut feed = Feed::read_from(BufReader::new(file)).unwrap();
+    if env::args_os()
+        .skip(1)
+        .next()
+        .map_or(false, |arg| arg == "gen-token")
+    {
+        return generate_token();
+    }
 
-    // Write
-    let generator = Generator {
-        value: env!("CARGO_PKG_NAME").to_string(),
-        version: Some(env!("CARGO_PKG_VERSION").to_string()),
-        ..Default::default()
-    };
-    feed.set_generator(generator);
-
-    //let sys_time = SystemTime::now();
-    //let timestamp=sys_time.duration_since(SystemTime::UNIX_EPOCH).unwrap();
-    let local: DateTime<Utc> = Utc::now();
-
-    //let now = FixedDateTime::from_timestamp(timestamp, 0).unwrap();
-    feed.set_updated(local);
-
-    // write to the feed to a writer
-    //feed.write_to(sink()).unwrap();
-
-    // convert the feed to a string
-    let string = feed.to_string();
-    println!("{}", string);
-
-    let server_addr = (
-        env::var("VIDLATER_ADDRESS").unwrap_or_else(|_| String::from("0.0.0.0")),
-        env::var("VIDLATER_PORT")
-            .ok()
-            .and_then(|port| port.parse::<u16>().ok())
-            .unwrap_or(8001),
-    );
-
-    let server = match Server::new(server_addr.clone()) {
+    let config = read_config().expect("FIXME: config");
+    let server = match Server::new(
+        (config.addr.clone(), config.port),
+        config.private_token,
+        config.feed_token,
+    ) {
         Ok(server) => server,
         Err(err) => {
             eprintln!(
                 "ERROR: Unable to start http server on {}:{}: {}",
-                server_addr.0, server_addr.1, err
+                config.addr, config.port, err
             );
             process::exit(1);
         }
@@ -56,7 +44,44 @@ fn main() {
 
     println!(
         "INFO: http server running on http://{}:{}",
-        server_addr.0, server_addr.1
+        config.addr, config.port
     );
     server.handle_requests();
+}
+
+fn read_config() -> Result<Config, String> {
+    let server_addr = env::var(ENV_ADDRESS).unwrap_or_else(|_| String::from("0.0.0.0"));
+    let server_port = env::var(ENV_PORT)
+        .ok()
+        .and_then(|port| port.parse::<u16>().ok())
+        .unwrap_or(8001);
+
+    let private_token = read_token(ENV_PRIVATE_TOKEN).map(PrivateToken)?;
+    let feed_token = read_token(ENV_FEED_TOKEN).map(FeedToken)?;
+
+    Ok(Config {
+        addr: server_addr,
+        port: server_port,
+        private_token,
+        feed_token,
+    })
+}
+
+fn read_token(name: &str) -> Result<String, String> {
+    let token = env::var(name).map_err(|err| match err {
+        VarError::NotPresent => format!("{} environment variable is not set", name),
+        VarError::NotUnicode(_) => format!("{} environment variable is not valid utf-8", name),
+    })?;
+
+    if token.len() < 32 {
+        return Err(format!("{} is too short", name));
+    }
+
+    Ok(token)
+}
+
+/// Generate and print a base62 encoded token
+fn generate_token() {
+    let token = base62::<32>();
+    println!("{token}");
 }
