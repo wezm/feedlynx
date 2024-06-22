@@ -97,7 +97,7 @@ fn summary_for_url(url: &URI) -> atom::Text {
             r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/{video_id}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>"#,
         ))
     } else {
-        atom::Text::html(r#"<a href="{url}">{url}</a>"#)
+        atom::Text::html(format!(r#"<a href="{url}">{url}</a>"#))
     }
 }
 
