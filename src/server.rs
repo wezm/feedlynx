@@ -71,49 +71,13 @@ impl Server {
                 // TODO: Require GET, handle HEAD
                 (Method::Get, "/") => Response::from_string(embed!("index.html"))
                     .with_header(HTML_CONTENT_TYPE.clone()),
-                (Method::Get, "/status.json") => {
-                    //let status = self.status.lock().expect("poisioned");
-                    //let asdf = status
-                    //    .iter()
-                    //    .map(|s| DeviceWithStatus::from(s))
-                    //    .collect::<Vec<_>>();
-                    //Response::from_string(serde_json::to_string(&asdf).unwrap())
-                    //    .with_header(JSON_CONTENT_TYPE.clone())
+                (Method::Get, "/feed") => {
                     todo!()
                 }
-                //"/wattsmart.js" => Response::from_string(embed!("../gleam/dist/wattsmart.js"))
-                //    .with_header(JS_CONTENT_TYPE.clone()),
-                //"/style.css" => {
-                //    Response::from_string(embed!("style.css")).with_header(CSS_CONTENT_TYPE.clone())
-                //}
-                //path if path.starts_with("/images/") => {
-                //    let data = match path {
-                //        "/images/computer.svg" => Some(embed!("noun-desktop-computer-6623437.svg")),
-                //        "/images/dishwasher.svg" => Some(embed!("noun-dishwasher-6745009.svg")),
-                //        "/images/freezer.svg" => Some(embed!("noun-freezer-4185404.svg")),
-                //        "/images/heater.svg" => Some(embed!("noun-heater-4214680.svg")),
-                //        "/images/lamp-tall.svg" => Some(embed!("noun-lamp-6798375.svg")),
-                //        "/images/lamp.svg" => Some(embed!("noun-lamp-6826738.svg")),
-                //        "/images/tv.svg" => Some(embed!("noun-lcd-37373.svg")),
-                //        "/images/washing-machine.svg" => {
-                //            Some(embed!("noun-washing-machine-6507851.svg"))
-                //        }
-                //        "/images/unknown.svg" => Some(embed!("noun-sensor-3980567.svg")),
-                //
-                //        "/images/power-on.svg" => Some(embed!("noun-power-on-6638635.svg")),
-                //        "/images/power-off.svg" => Some(embed!("noun-power-on-6638664.svg")),
-                //        _ => None,
-                //    };
-                //
-                //    match data {
-                //        Some(data) => {
-                //            Response::from_string(data).with_header(SVG_CONTENT_TYPE.clone())
-                //        }
-                //        None => Response::from_string(embed!("404.html"))
-                //            .with_header(HTML_CONTENT_TYPE.clone())
-                //            .with_status_code(404),
-                //    }
-                //}
+                (Method::Post, "/add") => match self.add(&mut request) {
+                    Ok(()) => Response::from_string("Created").with_status_code(201),
+                    Err(status) => Response::from_string("Failed").with_status_code(status),
+                },
                 _ => Response::from_string(embed!("404.html"))
                     .with_header(HTML_CONTENT_TYPE.clone())
                     .with_status_code(404),
@@ -145,32 +109,19 @@ impl Server {
             _ => {}
         });
 
+        let token = token.ok_or(StatusCode::from(400))?;
+
         // Validate token
-        //if token != self.token {
-        //    return StatusCode::from(401); // TODO: constant these codes
-        //}
+        if self.private_token != *token {
+            return Err(StatusCode::from(401)); // TODO: constant these codes
+        }
 
         // Parse URL
         let Some(url) = url.as_ref().map(|u| URI::try_from(u.as_ref()).ok()) else {
             return Err(StatusCode::from(400)); // Bad request
         };
 
-        //find(|(key, _value)| key == "text") {
-        //    Some((_key, text)) if !is_blank(&text) => (
-        //        object! {
-        //          "response_type": "in_channel",
-        //          "text": &*substitute_urls(&text),
-        //        },
-        //        StatusCode::from(200),
-        //    ),
-        //    Some(_) | None => (
-        //        object! {
-        //            "response_type": "ephemeral",
-        //            "text": "You need to supply some text",
-        //        },
-        //        StatusCode::from(200),
-        //    ),
-        //}
+        // Add to the feed
 
         Ok(())
     }
@@ -184,24 +135,12 @@ impl Server {
             .headers()
             .iter()
             .find(|&header| header.field == CONTENT_TYPE)
-            .ok_or_else(|| {
-                //String::from("Content-Type header not found"),
-                StatusCode::from(BAD_REQUEST)
-            })?;
+            .ok_or_else(|| StatusCode::from(BAD_REQUEST))?;
 
         if content_type.value != "application/x-www-form-urlencoded" {
             return Err(StatusCode::from(400));
         }
-        //let authorization = request
-        //    .headers()
-        //    .iter()
-        //    .find(|&header| header.field == *AUTHORIZATION)
-        //    .ok_or_else(|| {
-        //        (
-        //            String::from("Authorization header not found"),
-        //            StatusCode::from(BAD_REQUEST),
-        //        )
-        //    })?;
+
         Ok(())
     }
 }

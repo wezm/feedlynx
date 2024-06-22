@@ -17,6 +17,12 @@ pub struct PrivateToken(pub String);
 
 pub struct FeedToken(pub String);
 
+impl PartialEq<str> for PrivateToken {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
