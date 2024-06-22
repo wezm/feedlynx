@@ -4,12 +4,16 @@ use std::{
     process::{self, ExitCode},
 };
 
+use env_logger::Env;
+use log::{error, info};
+
 use vidlater::{base62::base62, Feed, FeedToken, PrivateToken, Server};
 
 const ENV_ADDRESS: &str = "VIDLATER_ADDRESS";
 const ENV_PORT: &str = "VIDLATER_PORT";
 const ENV_PRIVATE_TOKEN: &str = "VIDLATER_PRIVATE_TOKEN";
 const ENV_FEED_TOKEN: &str = "VIDLATER_FEED_TOKEN";
+const ENV_LOG: &str = "VIDLATER_LOG";
 
 struct Config {
     addr: String,
@@ -19,6 +23,12 @@ struct Config {
 }
 
 fn main() -> ExitCode {
+    match env::var_os(ENV_LOG) {
+        None => env::set_var(ENV_LOG, "info"),
+        Some(_) => {}
+    }
+    env_logger::init_from_env(Env::new().filter(ENV_LOG));
+
     let arg = env::args_os().skip(1).next();
 
     let feed_path = match arg {
@@ -35,6 +45,7 @@ fn main() -> ExitCode {
 
     // Create the feed file if it does not exist
     if !feed_path.exists() {
+        info!("Creating initial feed at {}", feed_path.display());
         let feed = Feed::empty(&feed_path);
         feed.save().expect("FIXME");
     }
@@ -48,16 +59,16 @@ fn main() -> ExitCode {
     ) {
         Ok(server) => server,
         Err(err) => {
-            eprintln!(
-                "ERROR: Unable to start http server on {}:{}: {}",
+            error!(
+                "Unable to start http server on {}:{}: {}",
                 config.addr, config.port, err
             );
             process::exit(1);
         }
     };
 
-    println!(
-        "INFO: http server running on http://{}:{}",
+    info!(
+        "http server running on http://{}:{}",
         config.addr, config.port
     );
     server.handle_requests();

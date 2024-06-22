@@ -5,6 +5,7 @@ use std::{borrow::Cow, fs::File};
 
 use atom_syndication::{self as atom, Generator};
 use chrono::{DateTime, Utc};
+use log::{debug, info};
 use uriparse::URI;
 
 use crate::{embed, Error};
@@ -38,6 +39,7 @@ impl Feed {
     }
 
     pub fn add_url(&mut self, url: &URI) {
+        info!("Add {}", url);
         let now: DateTime<Utc> = Utc::now();
 
         // Add the new item
@@ -77,9 +79,11 @@ impl Feed {
             let writer = BufWriter::new(tmp_file);
             let mut writer = self.feed.write_to(writer)?;
             writer.flush()?;
+            debug!("Wrote {}", tmp_path.display())
         }
 
         // Move into place atomically
+        debug!("Move {} -> {}", tmp_path.display(), self.path.display());
         fs::rename(tmp_path, &self.path).map_err(Error::from)
     }
 

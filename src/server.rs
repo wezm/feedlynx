@@ -1,8 +1,10 @@
+use std::borrow::Cow;
 use std::error::Error;
 use std::fs::File;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 
+use log::{debug, error, log_enabled};
 use tiny_http::{Header, HeaderField, Method, Request, Response, StatusCode};
 use uriparse::URI;
 
@@ -55,7 +57,11 @@ impl Server {
                             // instead of falling through to the code at the bottom.
                             let response =
                                 Response::from_file(file).with_header(atom_content_type.clone());
-                            let _ = request.respond(response);
+                            log_request(&request, response.status_code());
+                            match request.respond(response) {
+                                Ok(()) => {}
+                                Err(err) => error!("Failed to send response: {err}"),
+                            }
                             continue;
                         }
                         Err(err) => {
@@ -73,9 +79,12 @@ impl Server {
                     .with_status_code(404),
             };
 
-            // Ignoring I/O errors that occur here so that we don't take down the process if there
-            // is an issue sending the response.
-            let _ = request.respond(response);
+            log_request(&request, response.status_code());
+
+            match request.respond(response) {
+                Ok(()) => {}
+                Err(err) => error!("Failed to send response: {err}"),
+            }
         }
     }
 
@@ -139,6 +148,31 @@ impl Server {
 
 fn is_blank(text: &str) -> bool {
     text.chars().all(|ch| ch.is_whitespace())
+}
+
+fn log_request(request: &Request, status: StatusCode) {
+    if log_enabled!(log::Level::Debug) {
+        let user_agent_header: HeaderField = "User-Agent".parse().unwrap(); // TODO: avoid parsing this every time
+        let host = request
+            .remote_addr()
+            .map(|sock| Cow::from(sock.to_string()))
+            .unwrap_or_else(|| Cow::from("-"));
+        let user_agent = request.headers().iter().find_map(|header| {
+            if header.field == user_agent_header {
+                Some(header.value.as_str())
+            } else {
+                None
+            }
+        });
+        debug!(
+            "{} \"{} {}\" {} \"{}\"",
+            host,
+            request.method().as_str(),
+            request.url(),
+            status.0,
+            user_agent.unwrap_or("-")
+        )
+    }
 }
 
 /*
