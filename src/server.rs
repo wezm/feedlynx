@@ -71,7 +71,7 @@ impl Server {
                     }
                 }
                 (Method::Post, "/add") => match self.add(&mut request) {
-                    Ok(()) => Response::from_string("Created").with_status_code(201),
+                    Ok(()) => Response::from_string("Added\n").with_status_code(201),
                     Err(status) => Response::from_string("Failed").with_status_code(status),
                 },
                 _ => Response::from_string(embed!("404.html"))
@@ -121,10 +121,15 @@ impl Server {
         };
 
         // Add to the feed
-        let mut feed = Feed::new("feed.xml").expect("FIXME");
+        let mut feed = Feed::new(&self.feed_path).expect("FIXME");
         feed.add_url(&url);
-
-        Ok(())
+        match feed.save() {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                error!("Unable to save feed: {err}");
+                Err(StatusCode::from(500))
+            }
+        }
     }
 
     fn validate_request(request: &Request) -> Result<(), StatusCode> {

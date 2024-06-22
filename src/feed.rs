@@ -5,7 +5,7 @@ use std::{borrow::Cow, fs::File};
 
 use atom_syndication::{self as atom, Generator};
 use chrono::{DateTime, Utc};
-use log::{debug, info};
+use log::{debug, info, trace};
 use uriparse::URI;
 
 use crate::{embed, Error};
@@ -43,14 +43,17 @@ impl Feed {
         let now: DateTime<Utc> = Utc::now();
 
         // Add the new item
-        let summary = atom::Text::html(
-            r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/1162ouPHH3Q" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe> "#,
-        );
+        let link = atom::Link {
+            href: url.to_string(),
+            rel: "alternate".to_string(),
+            ..Default::default()
+        };
         let entry = atom::Entry {
-            title: "Title".into(),
+            title: "Title".into(), // FIXME: pull from POST body
             id: format!("{}", url),
             updated: now.into(),
-            summary: Some(summary),
+            summary: Some(summary_for_url(url)),
+            links: vec![link],
             // authors: vec![author],
             ..Default::default()
         };
@@ -79,11 +82,11 @@ impl Feed {
             let writer = BufWriter::new(tmp_file);
             let mut writer = self.feed.write_to(writer)?;
             writer.flush()?;
-            debug!("Wrote {}", tmp_path.display())
+            trace!("Wrote {}", tmp_path.display())
         }
 
         // Move into place atomically
-        debug!("Move {} -> {}", tmp_path.display(), self.path.display());
+        trace!("Move {} -> {}", tmp_path.display(), self.path.display());
         fs::rename(tmp_path, &self.path).map_err(Error::from)
     }
 
@@ -94,6 +97,17 @@ impl Feed {
             ..Default::default()
         };
         self.feed.set_generator(generator);
+    }
+}
+
+fn summary_for_url(url: &URI) -> atom::Text {
+    let video_id = is_youtube(url).then(|| youtube_video_id(url)).flatten();
+    if let Some(video_id) = video_id {
+        atom::Text::html(format!(
+            r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/{video_id}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>"#,
+        ))
+    } else {
+        atom::Text::html(r#"<a href="{url}">{url}</a>"#)
     }
 }
 
