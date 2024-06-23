@@ -11,6 +11,8 @@ use uriparse::URI;
 use crate::webpage::WebPage;
 use crate::{base62, Error};
 
+const MAX_ENTRIES: usize = 50;
+
 pub struct Feed {
     path: PathBuf,
     feed: atom_syndication::Feed,
@@ -75,6 +77,17 @@ impl Feed {
         self.feed.entries.push(entry);
         self.set_generator();
         self.feed.set_updated(now);
+    }
+
+    /// Ensure there's no more than MAX_ENTRIES entries in the feed
+    pub fn trim_entries(&mut self) {
+        if self.feed.entries().len() <= MAX_ENTRIES {
+            return;
+        }
+
+        let offset = self.feed.entries().len() - MAX_ENTRIES;
+        let keep = self.feed.entries.split_off(offset);
+        self.feed.entries = keep;
     }
 
     pub fn save(&self) -> Result<(), Error> {
