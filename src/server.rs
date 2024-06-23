@@ -14,6 +14,7 @@ use crate::webpage::WebPage;
 use crate::{embed, webpage, FeedToken, PrivateToken};
 
 const CREATED: u16 = 201;
+const NOT_MODIFIED: u16 = 304;
 const BAD_REQUEST: u16 = 400;
 const UNAUTHORIZED: u16 = 401;
 const NOT_FOUND: u16 = 404;
@@ -52,6 +53,7 @@ impl Server {
         let html_content_type: Header = "Content-type: text/html; charset=utf-8".parse().unwrap();
         let atom_content_type: Header = "Content-type: application/atom+xml".parse().unwrap();
         let last_modified_field: HeaderField = "Last-Modified".parse().unwrap();
+        let if_modified_since_field: HeaderField = "If-Modified-Since".parse().unwrap();
 
         info!("feed available at {}", self.feed_route);
 
@@ -60,21 +62,49 @@ impl Server {
                 (Method::Get, "/") => Response::from_string(embed!("index.html"))
                     .with_header(html_content_type.clone()),
                 // TODO: Handle query args (I.e. ignore them?)
+                // This branch has a different response type so we have to call respond and continue
+                // instead of falling through to the code at the bottom.
                 (Method::Get, path) if path == self.feed_route => {
                     match File::open(&self.feed_path) {
                         Ok(file) => {
-                            // TODO: Handle cache headers on the request
-                            let modified = file.metadata().and_then(|meta| meta.modified());
+                            let modified = file.metadata().and_then(|meta| meta.modified()).ok();
+                            let if_modified_since = request
+                                .headers()
+                                .iter()
+                                .find(|&header| header.field == if_modified_since_field)
+                                .and_then(|header| {
+                                    httpdate::parse_http_date(header.value.as_str()).ok()
+                                });
 
-                            // This branch has a different response type so we have to call respond and continue
-                            // instead of falling through to the code at the bottom.
+                            match (modified, if_modified_since) {
+                                // Send 304 response
+                                (Some(modified), Some(ifs)) if modified <= ifs => {
+                                    // https://www.rfc-editor.org/rfc/rfc7232#page-18 suggests Last-Modified should
+                                    // still be included in the 304 response
+                                    let response =
+                                        Response::empty(NOT_MODIFIED).with_header(Header {
+                                            field: last_modified_field.clone(),
+                                            // NOTE(unwrap): we always expect ASCII from fmt_http_date
+                                            value: fmt_http_date(modified).parse().unwrap(),
+                                        });
+                                    self.log_request(&request, response.status_code());
+                                    match request.respond(response) {
+                                        Ok(()) => {}
+                                        Err(err) => error!("Failed to send response: {err}"),
+                                    }
+                                    continue;
+                                }
+                                _ => {}
+                            }
+
+                            // Send 200 response with File
                             let mut response =
                                 Response::from_file(file).with_header(atom_content_type.clone());
-                            if let Ok(modifed) = modified {
+                            if let Some(modified) = modified {
                                 response = response.with_header(Header {
                                     field: last_modified_field.clone(),
                                     // NOTE(unwrap): we always expect ASCII from fmt_http_date
-                                    value: fmt_http_date(modifed).parse().unwrap(),
+                                    value: fmt_http_date(modified).parse().unwrap(),
                                 });
                             }
                             self.log_request(&request, response.status_code());
