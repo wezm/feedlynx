@@ -12,6 +12,12 @@ use crate::feed::Feed;
 use crate::webpage::WebPage;
 use crate::{embed, webpage, FeedToken, PrivateToken};
 
+const CREATED: u16 = 201;
+const BAD_REQUEST: u16 = 400;
+const UNAUTHORIZED: u16 = 401;
+const NOT_FOUND: u16 = 404;
+const INTERNAL_SERVER_ERROR: u16 = 500;
+
 pub struct Server {
     server: tiny_http::Server,
     private_token: PrivateToken,
@@ -71,17 +77,18 @@ impl Server {
                         }
                         Err(err) => {
                             error!("unable to open feed file: {}", err);
-                            Response::from_string(embed!("500.html")).with_status_code(500)
+                            Response::from_string(embed!("500.html"))
+                                .with_status_code(INTERNAL_SERVER_ERROR)
                         }
                     }
                 }
                 (Method::Post, "/add") => match self.add(&mut request) {
-                    Ok(()) => Response::from_string("Added\n").with_status_code(201),
+                    Ok(()) => Response::from_string("Added\n").with_status_code(CREATED),
                     Err(status) => Response::from_string("Failed").with_status_code(status),
                 },
                 _ => Response::from_string(embed!("404.html"))
                     .with_header(html_content_type.clone())
-                    .with_status_code(404),
+                    .with_status_code(NOT_FOUND),
             };
 
             self.log_request(&request, response.status_code());
@@ -100,7 +107,7 @@ impl Server {
         // FIXME: Limit the size of the body that will be read
         let mut body = Vec::new();
         if request.as_reader().read_to_end(&mut body).is_err() {
-            return Err(StatusCode::from(500));
+            return Err(StatusCode::from(INTERNAL_SERVER_ERROR));
         }
 
         // Parse the form submission and extract the token and url
@@ -115,16 +122,16 @@ impl Server {
             _ => {}
         });
 
-        let token = token.ok_or(StatusCode::from(400))?;
+        let token = token.ok_or(StatusCode::from(BAD_REQUEST))?;
 
         // Validate token
         if self.private_token != *token {
-            return Err(StatusCode::from(401)); // TODO: constant these codes
+            return Err(StatusCode::from(UNAUTHORIZED));
         }
 
         // Parse URL
         let Some(url) = url.as_ref().and_then(|u| URI::try_from(u.as_ref()).ok()) else {
-            return Err(StatusCode::from(400)); // Bad request
+            return Err(StatusCode::from(BAD_REQUEST));
         };
 
         // Fetch the page for extra metadata
@@ -144,7 +151,7 @@ impl Server {
             Ok(feed) => feed,
             Err(err) => {
                 error!("Unable to read feed: {err}");
-                return Err(StatusCode::from(500));
+                return Err(StatusCode::from(INTERNAL_SERVER_ERROR));
             }
         };
         feed.add_url(&url, page);
@@ -153,14 +160,12 @@ impl Server {
             Ok(()) => Ok(()),
             Err(err) => {
                 error!("Unable to save feed: {err}");
-                Err(StatusCode::from(500))
+                Err(StatusCode::from(INTERNAL_SERVER_ERROR))
             }
         }
     }
 
     fn validate_request(&self, request: &Request) -> Result<(), StatusCode> {
-        const BAD_REQUEST: u16 = 400;
-
         // Extract required headers
         let content_type = request
             .headers()
@@ -169,7 +174,7 @@ impl Server {
             .ok_or_else(|| StatusCode::from(BAD_REQUEST))?;
 
         if content_type.value != "application/x-www-form-urlencoded" {
-            return Err(StatusCode::from(400));
+            return Err(StatusCode::from(BAD_REQUEST));
         }
 
         Ok(())
