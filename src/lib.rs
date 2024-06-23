@@ -2,6 +2,7 @@ pub mod base62;
 mod feed;
 pub(crate) mod minrandom;
 mod server;
+pub mod webpage;
 
 use std::{fmt, io};
 

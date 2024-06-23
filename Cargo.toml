@@ -8,9 +8,16 @@ atom_syndication = { version = "0.12.3", default-features = false }
 chrono = { version = "0.4.38", default-features = false, features = ["now", "std"] }
 env_logger = { version = "0.11.3", default-features = false, features = ["humantime"]}
 form_urlencoded = "1.2.1"
+html5gum = "0.5.7"
 log = "0.4.21"
+minreq = "2.11.2"
 tiny_http = "0.12.0"
 uriparse = "0.6.4"
 
 [profile.release]
 strip = "debuginfo"
+
+[features]
+default = ["rust-tls"]
+native-tls = ["minreq/https-native"]
+rust-tls = ["minreq/https-rustls"]

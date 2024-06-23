@@ -1,5 +1,6 @@
 use std::{
     env::{self, VarError},
+    ffi::OsString,
     path::PathBuf,
     process::{self, ExitCode},
 };
@@ -7,7 +8,7 @@ use std::{
 use env_logger::Env;
 use log::{error, info};
 
-use vidlater::{base62::base62, Feed, FeedToken, PrivateToken, Server};
+use vidlater::{base62::base62, webpage, Feed, FeedToken, PrivateToken, Server};
 
 const ENV_ADDRESS: &str = "VIDLATER_ADDRESS";
 const ENV_PORT: &str = "VIDLATER_PORT";
@@ -29,11 +30,16 @@ fn main() -> ExitCode {
     }
     env_logger::init_from_env(Env::new().filter(ENV_LOG));
 
-    let arg = env::args_os().skip(1).next();
+    let mut args = env::args_os().skip(1);
+    let arg = args.next();
 
     let feed_path = match arg {
         Some(arg) if arg == "gen-token" => {
             generate_token();
+            return ExitCode::SUCCESS;
+        }
+        Some(arg) if arg == "fetch" => {
+            fetch_webpage(args.next());
             return ExitCode::SUCCESS;
         }
         Some(arg) => PathBuf::from(arg),
@@ -110,4 +116,23 @@ fn read_token(name: &str) -> Result<String, String> {
 /// Generate and print a base62 encoded token
 fn generate_token() {
     println!("{}", base62::<32>());
+}
+
+fn fetch_webpage(url: Option<OsString>) {
+    let Some(url) = url.as_ref().and_then(|os| os.to_str()) else {
+        error!("missing url");
+        return;
+    };
+
+    match webpage::fetch(url) {
+        Ok(page) => {
+            println!(
+                "title: {:?}\ndescription: {:?}",
+                page.title, page.description
+            )
+        }
+        Err(err) => {
+            println!("unable to fetch page: {err}")
+        }
+    }
 }
