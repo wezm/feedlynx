@@ -18,6 +18,7 @@ pub enum WebPageError {
         status_code: i32,
         reason_phrase: String,
     },
+    NotHtml,
 }
 
 pub fn fetch<U: Into<URL>>(url: U) -> Result<WebPage, WebPageError> {
@@ -43,6 +44,15 @@ pub fn fetch<U: Into<URL>>(url: U) -> Result<WebPage, WebPageError> {
             status_code: resp.status_code,
             reason_phrase: resp.reason_phrase,
         });
+    }
+
+    // Check that response is HTML
+    if !resp
+        .headers
+        .get("content-type")
+        .map_or(false, |content_type| content_type.contains("text/html"))
+    {
+        return Err(WebPageError::NotHtml);
     }
 
     let tokenizer = Tokenizer::new(IoReader::new(resp));
@@ -149,6 +159,7 @@ impl fmt::Display for WebPageError {
                 f,
                 "HTTP request was unsuccessful: {reason_phrase} ({status_code})"
             ),
+            WebPageError::NotHtml => f.write_str("Response was not HTML"),
         }
     }
 }
