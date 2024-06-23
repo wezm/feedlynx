@@ -54,13 +54,22 @@ impl Feed {
             rel: "alternate".to_string(),
             ..Default::default()
         };
+        let authors = page
+            .author
+            .map(|author| {
+                vec![atom::Person {
+                    name: author,
+                    ..Default::default()
+                }]
+            })
+            .unwrap_or_default();
         let entry = atom::Entry {
             title: page.title.unwrap_or_else(|| "Untitled".to_string()).into(),
             id: unique_tag_id(),
             updated: now.into(),
             summary: Some(summary_for_url(url, page.description)),
             links: vec![link],
-            // authors: vec![author],
+            authors,
             ..Default::default()
         };
         self.feed.entries.push(entry);

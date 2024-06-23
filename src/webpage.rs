@@ -8,6 +8,7 @@ use minreq::URL;
 pub struct WebPage {
     pub title: Option<String>,
     pub description: Option<String>,
+    pub author: Option<String>,
 }
 
 #[derive(Debug)]
@@ -65,11 +66,11 @@ fn extract_meta_data(
 ) -> Result<WebPage, WebPageError> {
     let mut title = None;
     let mut description = None;
+    let mut author = None;
 
     let property_attr = HtmlString(b"property".to_vec());
     let content_attr = HtmlString(b"content".to_vec());
     let name_attr = HtmlString(b"name".to_vec());
-    let description_attr = HtmlString(b"description".to_vec());
 
     let mut title_tag = String::new();
     let mut in_title = false;
@@ -96,10 +97,13 @@ fn extract_meta_data(
                     Some(b"og:description") => set_if_longer(&mut description, content),
                     Some(_) => {}
                     // Check for <meta name="description" content="...">
+                    // <meta name="author" content="...">
                     None => {
                         let name = tag.attributes.get(&name_attr);
-                        if name == Some(&description_attr) {
-                            set_if_longer(&mut description, content)
+                        match name.map(|s| s.as_slice()) {
+                            Some(b"author") => set_if_longer(&mut author, content),
+                            Some(b"description") => set_if_longer(&mut description, content),
+                            _ => {}
                         }
                     }
                 }
@@ -122,7 +126,11 @@ fn extract_meta_data(
         set_if_longer(&mut title, &title_tag)
     }
 
-    Ok(WebPage { title, description })
+    Ok(WebPage {
+        title,
+        description,
+        author,
+    })
 }
 
 fn set_if_longer(value: &mut Option<String>, candidate: &str) {
