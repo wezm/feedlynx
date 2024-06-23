@@ -242,4 +242,8 @@ impl Server {
             )
         }
     }
+
+    pub fn shutdown(&self) {
+        self.server.unblock();
+    }
 }

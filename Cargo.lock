@@ -527,6 +527,7 @@ dependencies = [
  "form_urlencoded",
  "html5gum",
  "httpdate",
+ "libc",
  "log",
  "minreq",
  "tiny_http",

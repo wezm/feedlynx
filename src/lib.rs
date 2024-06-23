@@ -2,12 +2,14 @@ pub mod base62;
 mod feed;
 pub(crate) mod minrandom;
 mod server;
+mod signals;
 pub mod webpage;
 
 use std::{fmt, io};
 
 pub use feed::Feed;
 pub use server::Server;
+pub use signals::block_until_signalled;
 
 #[derive(Debug)]
 pub enum Error {

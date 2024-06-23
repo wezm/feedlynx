@@ -17,6 +17,7 @@ env_logger = { version = "0.11.3", default-features = false, features = ["humant
 form_urlencoded = "1.2.1"
 html5gum = "0.5.7"
 httpdate = "1.0.3"
+libc = "0.2.155"
 log = "0.4.21"
 minreq = "2.11.2"
 tiny_http = "0.12.0"

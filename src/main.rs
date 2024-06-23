@@ -3,10 +3,12 @@ use std::{
     ffi::OsString,
     path::PathBuf,
     process::{self, ExitCode},
+    sync::Arc,
+    thread,
 };
 
 use env_logger::Env;
-use log::{error, info};
+use log::{error, info, trace};
 
 use vidlater::{base62::base62, webpage, Feed, FeedToken, PrivateToken, Server};
 
@@ -80,7 +82,7 @@ fn main() -> ExitCode {
         config.feed_token,
         feed_path,
     ) {
-        Ok(server) => server,
+        Ok(server) => Arc::new(server),
         Err(err) => {
             error!(
                 "Unable to start http server on {}:{}: {}",
@@ -90,11 +92,24 @@ fn main() -> ExitCode {
         }
     };
 
+    // Spawn thread to wait for signals
+    let server2 = Arc::clone(&server);
+    let join_handle = thread::spawn(move || {
+        trace!("waiting for signals...");
+        vidlater::block_until_signalled().unwrap(); // FIXME: unwrap
+        trace!("signalled!");
+        server2.shutdown();
+    });
+
     info!(
         "HTTP server running on: http://{}:{}",
         config.addr, config.port
     );
     server.handle_requests();
+    trace!("server finished handling requests");
+
+    // NOTE(unwrap): will propagate panic from thread (if applicable)
+    join_handle.join().unwrap();
 
     ExitCode::SUCCESS
 }
