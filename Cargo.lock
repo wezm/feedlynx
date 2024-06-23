@@ -526,6 +526,7 @@ dependencies = [
  "env_logger",
  "form_urlencoded",
  "html5gum",
+ "httpdate",
  "log",
  "minreq",
  "tiny_http",

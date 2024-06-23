@@ -16,6 +16,7 @@ chrono = { version = "0.4.38", default-features = false, features = ["now", "std
 env_logger = { version = "0.11.3", default-features = false, features = ["humantime"]}
 form_urlencoded = "1.2.1"
 html5gum = "0.5.7"
+httpdate = "1.0.3"
 log = "0.4.21"
 minreq = "2.11.2"
 tiny_http = "0.12.0"

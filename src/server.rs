@@ -4,6 +4,7 @@ use std::fs::File;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 
+use httpdate::fmt_http_date;
 use log::{debug, error, info, log_enabled, warn};
 use tiny_http::{Header, HeaderField, Method, Request, Response, StatusCode};
 use uriparse::URI;
@@ -50,6 +51,7 @@ impl Server {
     pub fn handle_requests(&self) {
         let html_content_type: Header = "Content-type: text/html; charset=utf-8".parse().unwrap();
         let atom_content_type: Header = "Content-type: application/atom+xml".parse().unwrap();
+        let last_modified_field: HeaderField = "Last-Modified".parse().unwrap();
 
         info!("feed available at {}", self.feed_route);
 
@@ -61,13 +63,20 @@ impl Server {
                 (Method::Get, path) if path == self.feed_route => {
                     match File::open(&self.feed_path) {
                         Ok(file) => {
-                            // TODO: Set cache headers on the response
                             // TODO: Handle cache headers on the request
+                            let modified = file.metadata().and_then(|meta| meta.modified());
 
                             // This branch has a different response type so we have to call respond and continue
                             // instead of falling through to the code at the bottom.
-                            let response =
+                            let mut response =
                                 Response::from_file(file).with_header(atom_content_type.clone());
+                            if let Ok(modifed) = modified {
+                                response = response.with_header(Header {
+                                    field: last_modified_field.clone(),
+                                    // NOTE(unwrap): we always expect ASCII from fmt_http_date
+                                    value: fmt_http_date(modifed).parse().unwrap(),
+                                });
+                            }
                             self.log_request(&request, response.status_code());
                             match request.respond(response) {
                                 Ok(()) => {}
