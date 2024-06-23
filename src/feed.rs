@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use log::{debug, info, trace};
 use uriparse::URI;
 
+use crate::webpage::WebPage;
 use crate::{embed, Error};
 
 pub struct Feed {
@@ -38,7 +39,7 @@ impl Feed {
         feed
     }
 
-    pub fn add_url(&mut self, url: &URI, title: String) {
+    pub fn add_url(&mut self, url: &URI, page: WebPage) {
         info!("Add {}", url);
         let now: DateTime<Utc> = Utc::now();
 
@@ -49,10 +50,10 @@ impl Feed {
             ..Default::default()
         };
         let entry = atom::Entry {
-            title: title.into(),
+            title: page.title.unwrap_or_else(|| "Untitled".to_string()).into(),
             id: format!("{}", url), // FIXME: proper id
             updated: now.into(),
-            summary: Some(summary_for_url(url)),
+            summary: Some(summary_for_url(url, page.description)),
             links: vec![link],
             // authors: vec![author],
             ..Default::default()
@@ -90,14 +91,23 @@ impl Feed {
     }
 }
 
-fn summary_for_url(url: &URI) -> atom::Text {
+fn summary_for_url(url: &URI, description: Option<String>) -> atom::Text {
     let video_id = is_youtube(url).then(|| youtube_video_id(url)).flatten();
     if let Some(video_id) = video_id {
-        atom::Text::html(format!(
+        let mut summary = format!(
             r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/{video_id}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>"#,
-        ))
+        );
+        if let Some(desc) = description.as_deref() {
+            summary.push_str("<div>");
+            summary.push_str(desc); // description is expected to be plain text
+            summary.push_str("</div>");
+        }
+        atom::Text::html(summary)
     } else {
-        atom::Text::html(format!(r#"<a href="{url}">{url}</a>"#))
+        match description {
+            Some(desc) => atom::Text::plain(desc),
+            None => atom::Text::html(format!(r#"<a href="{url}">{url}</a>"#)),
+        }
     }
 }
 

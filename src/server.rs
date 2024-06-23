@@ -4,12 +4,13 @@ use std::fs::File;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 
-use log::{debug, error, log_enabled};
+use log::{debug, error, log_enabled, warn};
 use tiny_http::{Header, HeaderField, Method, Request, Response, StatusCode};
 use uriparse::URI;
 
 use crate::feed::Feed;
-use crate::{embed, FeedToken, PrivateToken};
+use crate::webpage::WebPage;
+use crate::{embed, webpage, FeedToken, PrivateToken};
 
 pub struct Server {
     server: tiny_http::Server,
@@ -122,9 +123,21 @@ impl Server {
             return Err(StatusCode::from(400)); // Bad request
         };
 
+        // Fetch the page for extra metadata
+        let mut page = match webpage::fetch(url.to_string()) {
+            Ok(page) => page,
+            Err(err) => {
+                warn!("Failed to fetch {}: {err}", url);
+                WebPage::default()
+            }
+        };
+        if page.title.is_none() && title.is_some() {
+            page.title = title.map(|cow| cow.into_owned());
+        }
+
         // Add to the feed
         let mut feed = Feed::new(&self.feed_path).expect("FIXME");
-        feed.add_url(&url, title.unwrap_or(Cow::from("Untitled")).into_owned());
+        feed.add_url(&url, page);
         match feed.save() {
             Ok(()) => Ok(()),
             Err(err) => {
