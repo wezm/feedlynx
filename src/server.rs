@@ -18,6 +18,7 @@ pub struct Server {
     feed_path: PathBuf,
     feed_route: String,
     content_type_field: HeaderField,
+    user_agent_field: HeaderField,
 }
 
 impl Server {
@@ -36,6 +37,7 @@ impl Server {
             feed_path,
             feed_route: format!("/feed/{}", feed_token.0),
             content_type_field: "Content-Type".parse().unwrap(),
+            user_agent_field: "User-Agent".parse().unwrap(),
         })
     }
 
@@ -60,7 +62,7 @@ impl Server {
                             // instead of falling through to the code at the bottom.
                             let response =
                                 Response::from_file(file).with_header(atom_content_type.clone());
-                            log_request(&request, response.status_code());
+                            self.log_request(&request, response.status_code());
                             match request.respond(response) {
                                 Ok(()) => {}
                                 Err(err) => error!("Failed to send response: {err}"),
@@ -82,7 +84,7 @@ impl Server {
                     .with_status_code(404),
             };
 
-            log_request(&request, response.status_code());
+            self.log_request(&request, response.status_code());
 
             match request.respond(response) {
                 Ok(()) => {}
@@ -172,33 +174,28 @@ impl Server {
 
         Ok(())
     }
-}
 
-fn is_blank(text: &str) -> bool {
-    text.chars().all(|ch| ch.is_whitespace())
-}
-
-fn log_request(request: &Request, status: StatusCode) {
-    if log_enabled!(log::Level::Debug) {
-        let user_agent_header: HeaderField = "User-Agent".parse().unwrap(); // TODO: avoid parsing this every time
-        let host = request
-            .remote_addr()
-            .map(|sock| Cow::from(sock.to_string()))
-            .unwrap_or_else(|| Cow::from("-"));
-        let user_agent = request.headers().iter().find_map(|header| {
-            if header.field == user_agent_header {
-                Some(header.value.as_str())
-            } else {
-                None
-            }
-        });
-        debug!(
-            "{} \"{} {}\" {} \"{}\"",
-            host,
-            request.method().as_str(),
-            request.url(),
-            status.0,
-            user_agent.unwrap_or("-")
-        )
+    fn log_request(&self, request: &Request, status: StatusCode) {
+        if log_enabled!(log::Level::Debug) {
+            let host = request
+                .remote_addr()
+                .map(|sock| Cow::from(sock.to_string()))
+                .unwrap_or_else(|| Cow::from("-"));
+            let user_agent = request.headers().iter().find_map(|header| {
+                if header.field == self.user_agent_field {
+                    Some(header.value.as_str())
+                } else {
+                    None
+                }
+            });
+            debug!(
+                "{} \"{} {}\" {} \"{}\"",
+                host,
+                request.method().as_str(),
+                request.url(),
+                status.0,
+                user_agent.unwrap_or("-")
+            )
+        }
     }
 }
