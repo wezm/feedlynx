@@ -138,7 +138,13 @@ impl Server {
         }
 
         // Add to the feed
-        let mut feed = Feed::read(&self.feed_path).expect("FIXME");
+        let mut feed = match Feed::read(&self.feed_path) {
+            Ok(feed) => feed,
+            Err(err) => {
+                error!("Unable to read feed: {err}");
+                return Err(StatusCode::from(500));
+            }
+        };
         feed.add_url(&url, page);
         feed.trim_entries();
         match feed.save() {
