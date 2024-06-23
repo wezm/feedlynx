@@ -53,10 +53,27 @@ fn main() -> ExitCode {
     if !feed_path.exists() {
         info!("Creating initial feed at {}", feed_path.display());
         let feed = Feed::generate_new(&feed_path);
-        feed.save().expect("FIXME");
+        match feed.save() {
+            Ok(()) => {}
+            Err(err) => {
+                eprintln!("FATAL: Unable to save initial feed: {err}");
+                return ExitCode::FAILURE;
+            }
+        }
     }
 
-    let config = read_config().expect("FIXME: config");
+    let config = match read_config() {
+        Ok(config) => config,
+        Err(err) => {
+            eprintln!("FATAL: Unable to read configuration: {err}");
+            eprintln!(
+                "{} and {} must both be set to a 32 character string",
+                ENV_PRIVATE_TOKEN, ENV_FEED_TOKEN
+            );
+            eprintln!("Generate tokens with: {} gen-token", env!("CARGO_BIN_NAME"));
+            return ExitCode::FAILURE;
+        }
+    };
     let server = match Server::new(
         (config.addr.clone(), config.port),
         config.private_token,
