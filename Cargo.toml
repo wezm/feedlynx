@@ -17,6 +17,9 @@ uriparse = "0.6.4"
 [profile.release]
 strip = "debuginfo"
 
+[profile.test]
+opt-level = 1
+
 [features]
 default = ["rust-tls"]
 native-tls = ["minreq/https-native"]
