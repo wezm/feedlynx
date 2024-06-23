@@ -91,7 +91,7 @@ fn main() -> ExitCode {
     };
 
     info!(
-        "http server running on http://{}:{}",
+        "HTTP server running on: http://{}:{}",
         config.addr, config.port
     );
     server.handle_requests();

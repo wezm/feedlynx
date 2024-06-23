@@ -4,7 +4,7 @@ use std::fs::File;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 
-use log::{debug, error, log_enabled, warn};
+use log::{debug, error, info, log_enabled, warn};
 use tiny_http::{Header, HeaderField, Method, Request, Response, StatusCode};
 use uriparse::URI;
 
@@ -42,6 +42,8 @@ impl Server {
     pub fn handle_requests(&self) {
         let html_content_type: Header = "Content-type: text/html; charset=utf-8".parse().unwrap();
         let atom_content_type: Header = "Content-type: application/atom+xml".parse().unwrap();
+
+        info!("feed available at {}", self.feed_route);
 
         for mut request in self.server.incoming_requests() {
             let response = match (request.method(), request.url()) {
