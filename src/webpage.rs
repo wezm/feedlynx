@@ -1,7 +1,7 @@
 use std::{fmt, io};
 
 use html5gum::{HtmlString, IoReader, Tokenizer};
-use log::{log_enabled, trace};
+use log::trace;
 use minreq::URL;
 
 #[derive(Default)]

@@ -2,6 +2,13 @@
 name = "vidlater"
 version = "0.1.0"
 edition = "2021"
+description = "TODO"
+license = "MIT OR Apache-2.0"
+
+homepage = "https://github.com/wezm/vidlater"
+repository = "https://github.com/wezm/vidlater"
+keywords = []
+categories = []
 
 [dependencies]
 atom_syndication = { version = "0.12.3", default-features = false }

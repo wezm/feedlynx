@@ -52,7 +52,7 @@ fn main() -> ExitCode {
     // Create the feed file if it does not exist
     if !feed_path.exists() {
         info!("Creating initial feed at {}", feed_path.display());
-        let feed = Feed::empty(&feed_path);
+        let feed = Feed::generate_new(&feed_path);
         feed.save().expect("FIXME");
     }
 

@@ -5,11 +5,11 @@ use std::{borrow::Cow, fs::File};
 
 use atom_syndication::{self as atom, Generator};
 use chrono::{DateTime, Utc};
-use log::{debug, info, trace};
+use log::{info, trace};
 use uriparse::URI;
 
 use crate::webpage::WebPage;
-use crate::{embed, Error};
+use crate::{base62, Error};
 
 pub struct Feed {
     path: PathBuf,
@@ -17,24 +17,29 @@ pub struct Feed {
 }
 
 impl Feed {
-    pub fn new<P: Into<PathBuf>>(path: P) -> Result<Feed, Error> {
+    pub fn read<P: Into<PathBuf>>(path: P) -> Result<Feed, Error> {
         let path = path.into();
-
-        // Read
         let file = File::open(&path)?;
         let feed = atom::Feed::read_from(BufReader::new(file))?;
 
         Ok(Feed { feed, path })
     }
 
-    pub fn empty<P: Into<PathBuf>>(path: P) -> Self {
-        let content = embed!("default.xml");
-        let feed = atom::Feed::read_from(BufReader::new(content.as_bytes()))
-            .expect("default feed is invalid");
+    /// Construct a new, empty feed
+    ///
+    /// Elements like atom:id are populated new unique values.
+    pub fn generate_new<P: Into<PathBuf>>(path: P) -> Self {
+        let feed = atom::Feed {
+            title: env!("CARGO_PKG_NAME").into(),
+            updated: Utc::now().into(),
+            ..Default::default()
+        };
         let mut feed = Feed {
             feed,
             path: path.into(),
         };
+        feed.set_feed_id();
+        feed.set_feed_author();
         feed.set_generator();
         feed
     }
@@ -81,6 +86,33 @@ impl Feed {
         fs::rename(tmp_path, &self.path).map_err(Error::from)
     }
 
+    /// Generate a new, unique id for this feed accoring to the [tag]
+    /// URI scheme.
+    ///
+    /// [tag]: http://www.faqs.org/rfcs/rfc4151.html
+    fn set_feed_id(&mut self) {
+        // The specific id within the tag namespace
+        let specific = base62::base62::<16>();
+        let id = format!("tag:{}.7bit.org,2024:{specific}", env!("CARGO_PKG_NAME"));
+        self.feed.set_id(id);
+    }
+
+    /// Populate the author of the feed.
+    ///
+    /// Atom requires that the feed has an author or every entry does. Since we
+    /// start off with an empty feed a default author is populated.
+    fn set_feed_author(&mut self) {
+        let author = atom::Person {
+            name: env!("CARGO_PKG_NAME").to_string(),
+            uri: Some(env!("CARGO_PKG_HOMEPAGE").to_string()),
+            ..Default::default()
+        };
+        self.feed.set_authors(vec![author]);
+    }
+
+    /// Set the generator of the feed
+    ///
+    /// Uses the current package name and version.
     fn set_generator(&mut self) {
         let generator = Generator {
             value: env!("CARGO_PKG_NAME").to_string(),

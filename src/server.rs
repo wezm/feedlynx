@@ -136,7 +136,7 @@ impl Server {
         }
 
         // Add to the feed
-        let mut feed = Feed::new(&self.feed_path).expect("FIXME");
+        let mut feed = Feed::read(&self.feed_path).expect("FIXME");
         feed.add_url(&url, page);
         match feed.save() {
             Ok(()) => Ok(()),
