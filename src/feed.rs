@@ -56,7 +56,7 @@ impl Feed {
         };
         let entry = atom::Entry {
             title: page.title.unwrap_or_else(|| "Untitled".to_string()).into(),
-            id: format!("{}", url), // FIXME: proper id
+            id: unique_tag_id(),
             updated: now.into(),
             summary: Some(summary_for_url(url, page.description)),
             links: vec![link],
@@ -91,10 +91,7 @@ impl Feed {
     ///
     /// [tag]: http://www.faqs.org/rfcs/rfc4151.html
     fn set_feed_id(&mut self) {
-        // The specific id within the tag namespace
-        let specific = base62::base62::<16>();
-        let id = format!("tag:{}.7bit.org,2024:{specific}", env!("CARGO_PKG_NAME"));
-        self.feed.set_id(id);
+        self.feed.set_id(unique_tag_id());
     }
 
     /// Populate the author of the feed.
@@ -188,6 +185,12 @@ fn youtube_video_id<'a>(url: &'a URI) -> Option<Cow<'a, str>> {
         });
 
     id
+}
+
+fn unique_tag_id() -> String {
+    // The specific id within the tag namespace
+    let specific = base62::base62::<16>();
+    format!("tag:vidlater.7bit.org,2024:{specific}") // FIXME: vidlater
 }
 
 #[cfg(test)]
