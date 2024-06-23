@@ -15,9 +15,9 @@ use crate::{embed, webpage, FeedToken, PrivateToken};
 pub struct Server {
     server: tiny_http::Server,
     private_token: PrivateToken,
-    // feed_token: FeedToken,
     feed_path: PathBuf,
     feed_route: String,
+    content_type_field: HeaderField,
 }
 
 impl Server {
@@ -33,9 +33,9 @@ impl Server {
         tiny_http::Server::http(addr).map(|server| Server {
             server,
             private_token,
-            // feed_token,
             feed_path,
             feed_route: format!("/feed/{}", feed_token.0),
+            content_type_field: "Content-Type".parse().unwrap(),
         })
     }
 
@@ -92,7 +92,7 @@ impl Server {
     }
 
     fn add(&self, request: &mut Request) -> Result<(), StatusCode> {
-        Self::validate_request(request)?;
+        self.validate_request(request)?;
 
         // Get the text field of the form data
         // FIXME: Limit the size of the body that will be read
@@ -156,15 +156,14 @@ impl Server {
         }
     }
 
-    fn validate_request(request: &Request) -> Result<(), StatusCode> {
+    fn validate_request(&self, request: &Request) -> Result<(), StatusCode> {
         const BAD_REQUEST: u16 = 400;
-        let CONTENT_TYPE: HeaderField = "Content-Type".parse().unwrap();
 
         // Extract required headers
         let content_type = request
             .headers()
             .iter()
-            .find(|&header| header.field == CONTENT_TYPE)
+            .find(|&header| header.field == self.content_type_field)
             .ok_or_else(|| StatusCode::from(BAD_REQUEST))?;
 
         if content_type.value != "application/x-www-form-urlencoded" {
@@ -203,41 +202,3 @@ fn log_request(request: &Request, status: StatusCode) {
         )
     }
 }
-
-/*
-
-<iframe width="560" height="315" src="https://www.youtube.com/embed/1162ouPHH3Q?si=NxxME0UqCBVlCsQK" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-
- <entry>
-  <id>yt:video:1162ouPHH3Q</id>
-  <yt:videoId>1162ouPHH3Q</yt:videoId>
-  <yt:channelId>UCJYJgj7rzsn0vdR7fkgjuIA</yt:channelId>
-  <title>I'm sick in a bizarre and horrifying way</title>
-  <link rel="alternate" href="https://www.youtube.com/watch?v=1162ouPHH3Q"/>
-  <author>
-   <name>styropyro</name>
-   <uri>https://www.youtube.com/channel/UCJYJgj7rzsn0vdR7fkgjuIA</uri>
-  </author>
-  <published>2024-06-06T18:28:02+00:00</published>
-  <updated>2024-06-13T20:36:43+00:00</updated>
-  <media:group>
-   <media:title>I'm sick in a bizarre and horrifying way</media:title>
-   <media:content url="https://www.youtube.com/v/1162ouPHH3Q?version=3" type="application/x-shockwave-flash" width="640" height="390"/>
-   <media:thumbnail url="https://i2.ytimg.com/vi/1162ouPHH3Q/hqdefault.jpg" width="480" height="360"/>
-   <media:description>my crazy tornado hunting adventure: https://www.youtube.com/watch?v=qR4p6knJuus
-
-links:
-storm chasing channel: https://www.youtube.com/@styro_drake
-shorts channel: https://www.youtube.com/@styropyroshorts
-instagram: https://www.instagram.com/styro.drake/
-patreon: https://www.patreon.com/styropyro
-twitter: https://twitter.com/styropyro_
-discord: https://discord.gg/hVZMcWT</media:description>
-   <media:community>
-    <media:starRating count="193523" average="5.00" min="1" max="5"/>
-    <media:statistics views="2047516"/>
-   </media:community>
-  </media:group>
- </entry>
-
-*/
