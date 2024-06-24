@@ -58,6 +58,10 @@ links to the Feedlynx feed.
 
 TODO: Update when the extension is written.
 
+### From Source
+
+See [Build From Source](#build-from-source) below.
+
 Usage
 -----
 
@@ -144,7 +148,6 @@ Feedlynx feed:
     curl -d 'url=https://github.com/wezm/feedlynx' \
          -d 'token=ExampleExampleExampleExample1234' \
          http://localhost:8001/add
-
 
 Build from Source
 -----------------
