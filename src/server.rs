@@ -21,6 +21,7 @@ const BAD_REQUEST: u16 = 400;
 const UNAUTHORIZED: u16 = 401;
 const NOT_FOUND: u16 = 404;
 const PAYLOAD_TOO_LARGE: u16 = 413;
+const UNSUPPORTED_MEDIA_TYPE: u16 = 415;
 const INTERNAL_SERVER_ERROR: u16 = 500;
 
 /// The maximum size in bytes that the server will accept in a POST to /add
@@ -35,6 +36,8 @@ pub struct Server {
     content_type_field: HeaderField,
     user_agent_field: HeaderField,
 }
+
+struct StatusError(StatusCode, &'static str);
 
 impl Server {
     pub fn new<A>(
@@ -124,7 +127,7 @@ impl Server {
                             continue;
                         }
                         Err(err) => {
-                            error!("unable to open feed file: {}", err);
+                            error!("Unable to open feed file: {}", err);
                             Response::from_string(embed!("500.html"))
                                 .with_status_code(INTERNAL_SERVER_ERROR)
                         }
@@ -134,7 +137,10 @@ impl Server {
                     let _lock = self.feed_lock.write().expect("poisioned");
                     match self.add(&mut request) {
                         Ok(()) => Response::from_string("Added\n").with_status_code(CREATED),
-                        Err(status) => Response::from_string("Failed").with_status_code(status),
+                        Err(StatusError(status, error)) => {
+                            Response::from_string(format!("Failed: {error}\n"))
+                                .with_status_code(status)
+                        }
                     }
                 }
                 _ => Response::from_string(embed!("404.html"))
@@ -151,7 +157,7 @@ impl Server {
         }
     }
 
-    fn add(&self, request: &mut Request) -> Result<(), StatusCode> {
+    fn add(&self, request: &mut Request) -> Result<(), StatusError> {
         self.validate_request(request)?;
 
         // Get the text field of the form data
@@ -170,12 +176,16 @@ impl Server {
                 Err(ref err) if err.kind() == io::ErrorKind::Interrupted => {}
                 Err(err) => {
                     error!("Unable to read POST body: {err}");
-                    return Err(INTERNAL_SERVER_ERROR.into());
+                    return Err(StatusError::new(
+                        INTERNAL_SERVER_ERROR,
+                        "Unable to read POST body",
+                    ));
                 }
             }
             if body.len() > MAX_POST_BODY {
-                error!("POST body exceeded maximum size");
-                return Err(PAYLOAD_TOO_LARGE.into());
+                let msg = "POST body exceeded maximum size";
+                error!("{msg}");
+                return Err(StatusError::new(PAYLOAD_TOO_LARGE, msg));
             }
         }
 
@@ -191,16 +201,16 @@ impl Server {
             _ => {}
         });
 
-        let token = token.ok_or(StatusCode::from(BAD_REQUEST))?;
+        let token = token.ok_or_else(|| StatusError::new(BAD_REQUEST, "Missing token"))?;
 
         // Validate token
         if self.private_token != *token {
-            return Err(StatusCode::from(UNAUTHORIZED));
+            return Err(StatusError::new(UNAUTHORIZED, "Invalid token"));
         }
 
         // Parse URL
         let Some(url) = url.as_ref().and_then(|u| URI::try_from(u.as_ref()).ok()) else {
-            return Err(StatusCode::from(BAD_REQUEST));
+            return Err(StatusError::new(BAD_REQUEST, "Invalid URL"));
         };
 
         // Fetch the page for extra metadata
@@ -216,34 +226,31 @@ impl Server {
         }
 
         // Add to the feed
-        let mut feed = match Feed::read(&self.feed_path) {
-            Ok(feed) => feed,
-            Err(err) => {
-                error!("Unable to read feed: {err}");
-                return Err(StatusCode::from(INTERNAL_SERVER_ERROR));
-            }
-        };
+        let mut feed = Feed::read(&self.feed_path).map_err(|err| {
+            error!("Unable to read feed file: {err}");
+            StatusError::new(INTERNAL_SERVER_ERROR, "Unable to read feed file")
+        })?;
         feed.add_url(&url, page);
         feed.trim_entries();
-        match feed.save() {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                error!("Unable to save feed: {err}");
-                Err(StatusCode::from(INTERNAL_SERVER_ERROR))
-            }
-        }
+        feed.save().map_err(|err| {
+            error!("Unable to save feed: {err}");
+            StatusError::new(INTERNAL_SERVER_ERROR, "Error saving feed file")
+        })
     }
 
-    fn validate_request(&self, request: &Request) -> Result<(), StatusCode> {
+    fn validate_request(&self, request: &Request) -> Result<(), StatusError> {
         // Extract required headers
         let content_type = request
             .headers()
             .iter()
             .find(|&header| header.field == self.content_type_field)
-            .ok_or_else(|| StatusCode::from(BAD_REQUEST))?;
+            .ok_or_else(|| StatusError::new(BAD_REQUEST, "Missing Content-Type"))?;
 
         if content_type.value != "application/x-www-form-urlencoded" {
-            return Err(StatusCode::from(BAD_REQUEST));
+            return Err(StatusError::new(
+                UNSUPPORTED_MEDIA_TYPE,
+                "Unsupported media type",
+            ));
         }
 
         Ok(())
@@ -275,5 +282,11 @@ impl Server {
 
     pub fn shutdown(&self) {
         self.server.unblock();
+    }
+}
+
+impl StatusError {
+    fn new<C: Into<StatusCode>>(code: C, message: &'static str) -> Self {
+        StatusError(code.into(), message)
     }
 }
