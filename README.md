@@ -49,7 +49,6 @@ Feedlynx is packaged in these package managers:
 * Brew: `feedlynx`
 * Chimera Linux: `feedlynx`
 
--->
 
 ### Browser Extension
 
@@ -57,6 +56,8 @@ There is a Firefox browser extension that makes it quick and easy to add new
 links to the Feedlynx feed.
 
 TODO: Update when the extension is written.
+
+-->
 
 ### From Source
 
@@ -67,7 +68,7 @@ Usage
 
     feedlynx path/to/feed.xml
 
-Feedlynx requires two environment varibles to be set:
+Feedlynx requires two environment variables to be set:
 
 * `FEEDLYNX_PRIVATE_TOKEN` used to authenticate requests to add a new link.
 * `FEEDLYNX_FEED_TOKEN` used in the path to the generated feed.
@@ -78,7 +79,7 @@ a randomly generated token.
 
 The following environment variables may optionally be set:
 
-* `FEEDLYNX_ADDR` —- the address to serve on, default `0.0.0.0`.
+* `FEEDLYNX_ADDRESS` —- the address to serve on, default `0.0.0.0`.
 * `FEEDLYNX_PORT` —- the port to serve on, default `8001`.
 * `FEEDLYNX_LOG` — controls the log level and filtering.
 
@@ -120,8 +121,8 @@ example to only show `trace` messages from `feedlynx` (and not some of the
 libraries it uses) you would specify: `FEEDLYNX_LOG=trace=feedlynx`. For more
 details refer to the [env_logger documentation][env_logger].
 
-At the `debug` level Feedlynx will print a webserver styled line for each
-request recieved.
+At the `debug` level Feedlynx will print a web-server styled line for each
+request received.
 
     [2024-06-24T07:48:39Z DEBUG feedlynx::server] 127.0.0.1:50202 "GET /feed/FeedFeedFeedFeedFeedFeedFeedFeed" 200 "curl/8.8.0"
 
@@ -137,7 +138,7 @@ The server exposes three end-points:
   Fields:
   - `url` (required) — the link to add.
   - `token` (required) — the value of `FEEDLYNX_PRIVATE_TOKEN`.
-  - `title` (optional) — the titlte of the link.
+  - `title` (optional) — the title of the link.
 * `GET /feed/<FEEDLYNX_FEED_TOKEN>` — the generated feed. Use this to subscribe to the feed in your feed reader.
 
 #### cURL Example
