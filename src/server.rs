@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fs::File;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
+use std::sync::RwLock;
 
 use httpdate::fmt_http_date;
 use log::{debug, error, info, log_enabled, warn};
@@ -25,6 +26,7 @@ pub struct Server {
     private_token: PrivateToken,
     feed_path: PathBuf,
     feed_route: String,
+    feed_lock: RwLock<()>,
     content_type_field: HeaderField,
     user_agent_field: HeaderField,
 }
@@ -44,6 +46,7 @@ impl Server {
             private_token,
             feed_path,
             feed_route: format!("/feed/{}", feed_token.0),
+            feed_lock: RwLock::new(()),
             content_type_field: "Content-Type".parse().unwrap(),
             user_agent_field: "User-Agent".parse().unwrap(),
         })
@@ -65,6 +68,7 @@ impl Server {
                 // This branch has a different response type so we have to call respond and continue
                 // instead of falling through to the code at the bottom.
                 (Method::Get, path) if path == self.feed_route => {
+                    let _lock = self.feed_lock.read().expect("poisioned");
                     match File::open(&self.feed_path) {
                         Ok(file) => {
                             let modified = file.metadata().and_then(|meta| meta.modified()).ok();
@@ -121,10 +125,12 @@ impl Server {
                         }
                     }
                 }
-                (Method::Post, "/add") => match self.add(&mut request) {
+                (Method::Post, "/add") => {
+                    let _lock = self.feed_lock.write().expect("poisioned");
+                    match self.add(&mut request) {
                     Ok(()) => Response::from_string("Added\n").with_status_code(CREATED),
                     Err(status) => Response::from_string("Failed").with_status_code(status),
-                },
+                }},
                 _ => Response::from_string(embed!("404.html"))
                     .with_header(html_content_type.clone())
                     .with_status_code(NOT_FOUND),
