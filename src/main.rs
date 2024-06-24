@@ -99,12 +99,15 @@ fn main() -> ExitCode {
 
     // Spawn thread to wait for signals
     let server2 = Arc::clone(&server);
-    let join_handle = thread::Builder::new().name("signal-handler".to_string()).spawn(move || {
-        trace!("waiting for signals...");
-        signals.block_until_signalled().unwrap(); // FIXME: unwrap
-        trace!("signalled!");
-        server2.shutdown();
-    }).unwrap();
+    let join_handle = thread::Builder::new()
+        .name("signal-handler".to_string())
+        .spawn(move || {
+            trace!("waiting for signals...");
+            signals.block_until_signalled().unwrap(); // FIXME: unwrap
+            trace!("signalled!");
+            server2.shutdown();
+        })
+        .unwrap();
 
     info!(
         "HTTP server running on: http://{}:{}",

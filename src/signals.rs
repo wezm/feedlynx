@@ -1,6 +1,9 @@
 #[cfg(unix)]
 pub use unix::SignalHandle;
 
+#[cfg(windows)]
+pub use windows::SignalHandle;
+
 #[cfg(unix)]
 mod unix {
     use std::{io, mem, ptr};
@@ -115,6 +118,21 @@ mod unix {
 
 #[cfg(windows)]
 mod windows {
+    pub struct SignalHandle {
+        _initialised: (),
+    }
+
+    impl SignalHandle {
+        pub fn new() -> io::Result<Self> {
+            unsafe { init_os_handler(true) }?;
+            Ok(SignalHandle { _initialised: () })
+        }
+
+        pub fn block_until_signalled(&self) -> io::Result<()> {
+            unsafe { block_ctrl_c() }
+        }
+    }
+
     // https://github.com/Detegr/rust-ctrlc/blob/b543abe6c25bd54754bbbbcfcff566e046f8e609/src/platform/windows/mod.rs
 
     // Copyright (c) 2017 CtrlC developers
@@ -133,12 +151,6 @@ mod windows {
     use windows_sys::Win32::System::Threading::{
         CreateSemaphoreA, ReleaseSemaphore, WaitForSingleObject, INFINITE,
     };
-
-    /// Platform specific error type
-    pub type Error = io::Error;
-
-    /// Platform specific signal type
-    pub type Signal = u32;
 
     const MAX_SEM_COUNT: i32 = 255;
     static mut SEMAPHORE: HANDLE = 0 as HANDLE;
@@ -160,7 +172,7 @@ mod windows {
     /// Will return an error if a system error occurred.
     ///
     #[inline]
-    pub unsafe fn init_os_handler(_overwrite: bool) -> Result<(), Error> {
+    pub unsafe fn init_os_handler(_overwrite: bool) -> io::Result<()> {
         SEMAPHORE = CreateSemaphoreA(ptr::null_mut(), 0, MAX_SEM_COUNT, ptr::null());
         if SEMAPHORE == 0 {
             return Err(io::Error::last_os_error());
@@ -184,7 +196,7 @@ mod windows {
     /// Will return an error if a system error occurred.
     ///
     #[inline]
-    pub unsafe fn block_ctrl_c() -> Result<(), Error> {
+    pub unsafe fn block_ctrl_c() -> io::Result<()> {
         match WaitForSingleObject(SEMAPHORE, INFINITE) {
             WAIT_OBJECT_0 => Ok(()),
             WAIT_FAILED => Err(io::Error::last_os_error()),
