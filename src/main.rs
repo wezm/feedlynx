@@ -91,7 +91,13 @@ fn main() -> ExitCode {
 
     // This set the signal mask, which has to happen before the server starts its threads
     // so that they inherit the mask
-    let signals = feedlynx::SignalHandle::new().unwrap(); // FIXME unwrap
+    let signals = match feedlynx::SignalHandle::new() {
+        Ok(handle) => handle,
+        Err(err) => {
+            eprintln!("FATAL: Unable to set signal mask: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
 
     let server = match Server::new(
         (config.addr.clone(), config.port),
@@ -115,11 +121,13 @@ fn main() -> ExitCode {
         .name("signal-handler".to_string())
         .spawn(move || {
             trace!("waiting for signals...");
-            signals.block_until_signalled().unwrap(); // FIXME: unwrap
-            trace!("signalled!");
+            match signals.block_until_signalled() {
+                Ok(()) => trace!("signalled!"),
+                Err(err) => error!("Waiting for signals failed: {err}"),
+            }
             server2.shutdown();
         })
-        .unwrap();
+        .unwrap(); // NOTE(unwrap): if thread fails to spawn panic seems reasonable
 
     info!(
         "HTTP server running on: http://{}:{}",
