@@ -9,7 +9,7 @@ use std::{fmt, io};
 
 pub use feed::Feed;
 pub use server::Server;
-pub use signals::block_until_signalled;
+pub use signals::SignalHandle;
 
 #[derive(Debug)]
 pub enum Error {

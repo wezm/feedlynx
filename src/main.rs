@@ -76,6 +76,11 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+
+    // This set the signal mask, which has to happen before the server starts its threads
+    // so that they inherit the mask
+    let signals = feedlynx::SignalHandle::new().unwrap(); // FIXME unwrap
+
     let server = match Server::new(
         (config.addr.clone(), config.port),
         config.private_token,
@@ -94,12 +99,12 @@ fn main() -> ExitCode {
 
     // Spawn thread to wait for signals
     let server2 = Arc::clone(&server);
-    let join_handle = thread::spawn(move || {
+    let join_handle = thread::Builder::new().name("signal-handler".to_string()).spawn(move || {
         trace!("waiting for signals...");
-        feedlynx::block_until_signalled().unwrap(); // FIXME: unwrap
+        signals.block_until_signalled().unwrap(); // FIXME: unwrap
         trace!("signalled!");
         server2.shutdown();
-    });
+    }).unwrap();
 
     info!(
         "HTTP server running on: http://{}:{}",

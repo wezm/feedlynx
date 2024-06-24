@@ -23,6 +23,9 @@ minreq = "2.11.2"
 tiny_http = "0.12.0"
 uriparse = "0.6.4"
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_Security", "Win32_System_Console"] }
+
 [profile.release]
 strip = "debuginfo"
 

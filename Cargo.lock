@@ -143,6 +143,7 @@ dependencies = [
  "minreq",
  "tiny_http",
  "uriparse",
+ "windows-sys",
 ]
 
 [[package]]
