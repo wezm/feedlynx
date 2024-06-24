@@ -62,6 +62,18 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         }
+    } else {
+        // Ensure existing feed can be read before starting the server
+        match Feed::read(&feed_path) {
+            Ok(_feed) => {}
+            Err(err) => {
+                eprintln!(
+                    "FATAL: Unable to read feed at {}: {err}",
+                    feed_path.display()
+                );
+                return ExitCode::FAILURE;
+            }
+        }
     }
 
     let config = match read_config() {
