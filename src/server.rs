@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::error::Error;
 use std::fs::File;
+use std::io;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::sync::RwLock;
@@ -19,7 +20,11 @@ const NOT_MODIFIED: u16 = 304;
 const BAD_REQUEST: u16 = 400;
 const UNAUTHORIZED: u16 = 401;
 const NOT_FOUND: u16 = 404;
+const PAYLOAD_TOO_LARGE: u16 = 413;
 const INTERNAL_SERVER_ERROR: u16 = 500;
+
+/// The maximum size in bytes that the server will accept in a POST to /add
+const MAX_POST_BODY: usize = 1_048_576; // 1MiB
 
 pub struct Server {
     server: tiny_http::Server,
@@ -128,9 +133,10 @@ impl Server {
                 (Method::Post, "/add") => {
                     let _lock = self.feed_lock.write().expect("poisioned");
                     match self.add(&mut request) {
-                    Ok(()) => Response::from_string("Added\n").with_status_code(CREATED),
-                    Err(status) => Response::from_string("Failed").with_status_code(status),
-                }},
+                        Ok(()) => Response::from_string("Added\n").with_status_code(CREATED),
+                        Err(status) => Response::from_string("Failed").with_status_code(status),
+                    }
+                }
                 _ => Response::from_string(embed!("404.html"))
                     .with_header(html_content_type.clone())
                     .with_status_code(NOT_FOUND),
@@ -150,9 +156,27 @@ impl Server {
 
         // Get the text field of the form data
         // FIXME: Limit the size of the body that will be read
+        let mut buf = [0; 8 * 1024];
         let mut body = Vec::new();
-        if request.as_reader().read_to_end(&mut body).is_err() {
-            return Err(StatusCode::from(INTERNAL_SERVER_ERROR));
+        let reader = request.as_reader();
+        loop {
+            match reader.read(&mut buf) {
+                // EOF reached; body successfully read
+                Ok(0) => break,
+                Ok(n) => {
+                    body.extend_from_slice(&buf[..n]);
+                }
+                // Retry
+                Err(ref err) if err.kind() == io::ErrorKind::Interrupted => {}
+                Err(err) => {
+                    error!("Unable to read POST body: {err}");
+                    return Err(INTERNAL_SERVER_ERROR.into());
+                }
+            }
+            if body.len() > MAX_POST_BODY {
+                error!("POST body exceeded maximum size");
+                return Err(PAYLOAD_TOO_LARGE.into());
+            }
         }
 
         // Parse the form submission and extract the token and url

@@ -26,7 +26,7 @@ pub fn fetch<U: Into<URL>>(url: U) -> Result<WebPage, WebPageError> {
     let resp = minreq::get(url)
         .with_timeout(30)
         .with_max_redirects(10)
-        .with_max_headers_size(4096)
+        .with_max_headers_size(8192) // GitHub sends back responses with more than 4KiB of headers
         .with_max_status_line_length(1024)
         // DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)
         .with_header(
