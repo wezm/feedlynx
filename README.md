@@ -15,8 +15,7 @@
   <a href="https://cirrus-ci.com/github/wezm/feedlynx">
     <img src="https://api.cirrus-ci.com/github/wezm/feedlynx.svg" alt="Build Status"></a>
   <a href="https://crates.io/crates/feedlynx">
-    <img src="https://img.shields.io/crates/v/feedlynx.svg" alt="Version">
-  </a>
+    <img src="https://img.shields.io/crates/v/feedlynx.svg" alt="Version"></a>
   <img src="https://img.shields.io/crates/l/feedlynx.svg" alt="License">
 </div>
 
