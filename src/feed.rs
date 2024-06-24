@@ -212,7 +212,7 @@ fn youtube_video_id<'a>(url: &'a URI) -> Option<Cow<'a, str>> {
 fn unique_tag_id() -> String {
     // The specific id within the tag namespace
     let specific = base62::base62::<16>();
-    format!("tag:vidlater.7bit.org,2024:{specific}") // FIXME: vidlater
+    format!("tag:feedlynx.7bit.org,2024:{specific}")
 }
 
 #[cfg(test)]

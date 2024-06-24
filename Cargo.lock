@@ -129,6 +129,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
 
 [[package]]
+name = "feedlynx"
+version = "0.1.0"
+dependencies = [
+ "atom_syndication",
+ "chrono",
+ "env_logger",
+ "form_urlencoded",
+ "html5gum",
+ "httpdate",
+ "libc",
+ "log",
+ "minreq",
+ "tiny_http",
+ "uriparse",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -516,23 +533,6 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
-
-[[package]]
-name = "vidlater"
-version = "0.1.0"
-dependencies = [
- "atom_syndication",
- "chrono",
- "env_logger",
- "form_urlencoded",
- "html5gum",
- "httpdate",
- "libc",
- "log",
- "minreq",
- "tiny_http",
- "uriparse",
-]
 
 [[package]]
 name = "wasi"

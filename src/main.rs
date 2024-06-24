@@ -10,13 +10,13 @@ use std::{
 use env_logger::Env;
 use log::{error, info, trace};
 
-use vidlater::{base62::base62, webpage, Feed, FeedToken, PrivateToken, Server};
+use feedlynx::{base62::base62, webpage, Feed, FeedToken, PrivateToken, Server};
 
-const ENV_ADDRESS: &str = "VIDLATER_ADDRESS";
-const ENV_PORT: &str = "VIDLATER_PORT";
-const ENV_PRIVATE_TOKEN: &str = "VIDLATER_PRIVATE_TOKEN";
-const ENV_FEED_TOKEN: &str = "VIDLATER_FEED_TOKEN";
-const ENV_LOG: &str = "VIDLATER_LOG";
+const ENV_ADDRESS: &str = "FEEDLYNX_ADDRESS";
+const ENV_PORT: &str = "FEEDLYNX_PORT";
+const ENV_PRIVATE_TOKEN: &str = "FEEDLYNX_PRIVATE_TOKEN";
+const ENV_FEED_TOKEN: &str = "FEEDLYNX_FEED_TOKEN";
+const ENV_LOG: &str = "FEEDLYNX_LOG";
 
 struct Config {
     addr: String,
@@ -96,7 +96,7 @@ fn main() -> ExitCode {
     let server2 = Arc::clone(&server);
     let join_handle = thread::spawn(move || {
         trace!("waiting for signals...");
-        vidlater::block_until_signalled().unwrap(); // FIXME: unwrap
+        feedlynx::block_until_signalled().unwrap(); // FIXME: unwrap
         trace!("signalled!");
         server2.shutdown();
     });
