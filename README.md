@@ -41,7 +41,7 @@ Pre-compiled binaries are available for a number of platforms:
 
 Check the [latest release] for download links.
 
-<!-
+<!--
 ### Package Manager
 
 Feedlynx is packaged in these package managers:
