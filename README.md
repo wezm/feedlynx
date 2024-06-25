@@ -79,7 +79,7 @@ a randomly generated token.
 
 The following environment variables may optionally be set:
 
-* `FEEDLYNX_ADDRESS` —- the address to serve on, default `0.0.0.0`.
+* `FEEDLYNX_ADDRESS` —- the address to serve on, default `127.0.0.1`.
 * `FEEDLYNX_PORT` —- the port to serve on, default `8001`.
 * `FEEDLYNX_LOG` — controls the log level and filtering.
 
@@ -93,7 +93,7 @@ feed in your feed reader.
     FEEDLYNX_PRIVATE_TOKEN=ExampleExampleExampleExample1234 \
     FEEDLYNX_FEED_TOKEN=FeedFeedFeedFeedFeedFeedFeedFeed \
     feedlynx feed.xml
-    [2024-06-24T08:52:11Z INFO  feedlynx] HTTP server running on: http://0.0.0.0:8001
+    [2024-06-24T08:52:11Z INFO  feedlynx] HTTP server running on: http://127.0.0.1:8001
     [2024-06-24T08:52:11Z INFO  feedlynx::server] feed available at /feed/FeedFeedFeedFeedFeedFeedFeedFeed
 
 If this instance of Feedlynx was hosted at `example.com` the URL of the feed
@@ -160,7 +160,7 @@ installing the toolchain][rustup].
 
 ### From Git Checkout or Release Tarball
 
-Build the binary with: 
+Build the binary with:
 
     cargo build --release --locked
 

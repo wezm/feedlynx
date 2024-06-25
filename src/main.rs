@@ -143,7 +143,7 @@ fn main() -> ExitCode {
 }
 
 fn read_config() -> Result<Config, String> {
-    let server_addr = env::var(ENV_ADDRESS).unwrap_or_else(|_| String::from("0.0.0.0"));
+    let server_addr = env::var(ENV_ADDRESS).unwrap_or_else(|_| String::from("127.0.0.1"));
     let server_port = env::var(ENV_PORT)
         .ok()
         .and_then(|port| port.parse::<u16>().ok())
