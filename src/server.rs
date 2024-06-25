@@ -33,6 +33,7 @@ pub struct Server {
     feed_path: RwLock<PathBuf>,
     feed_route: String,
     content_type_field: HeaderField,
+    host_field: HeaderField,
     user_agent_field: HeaderField,
 }
 
@@ -54,6 +55,7 @@ impl Server {
             feed_path: RwLock::new(feed_path),
             feed_route: format!("/feed/{}", feed_token.0),
             content_type_field: "Content-Type".parse().unwrap(),
+            host_field: "Host".parse().unwrap(),
             user_agent_field: "User-Agent".parse().unwrap(),
         })
     }
@@ -64,12 +66,18 @@ impl Server {
         let last_modified_field: HeaderField = "Last-Modified".parse().unwrap();
         let if_modified_since_field: HeaderField = "If-Modified-Since".parse().unwrap();
 
-        info!("feed available at {}", self.feed_route);
+        info!(
+            "Feed available at: http://{}{}",
+            self.server.server_addr(),
+            self.feed_route
+        );
 
         for mut request in self.server.incoming_requests() {
             let response = match (request.method(), request.url()) {
-                (Method::Get, "/") => Response::from_string(embed!("index.html"))
-                    .with_header(html_content_type.clone()),
+                (Method::Get, "/") => {
+                    let body = self.index(&request);
+                    Response::from_string(body).with_header(html_content_type.clone())
+                }
                 // TODO: Handle query args (I.e. ignore them?)
                 // This branch has a different response type so we have to call respond and continue
                 // instead of falling through to the code at the bottom.
@@ -149,6 +157,22 @@ impl Server {
                 Err(err) => error!("Failed to send response: {err}"),
             }
         }
+    }
+
+    fn index(&self, request: &Request) -> String {
+        let logo = embed!("../feedlynx.svg");
+        let host = request
+            .headers()
+            .iter()
+            .find_map(|header| {
+                (header.field == self.host_field).then(|| Cow::from(header.value.as_str()))
+            })
+            .unwrap_or_else(|| Cow::from(self.server.server_addr().to_string()));
+        let feed_url = format!("http://{host}/feed/FEEDLYNX_FEED_TOKEN");
+        embed!("index.html")
+            .into_owned()
+            .replace("{{logo}}", &logo)
+            .replace("{{feed}}", &feed_url)
     }
 
     fn add(&self, request: &mut Request) -> Result<(), StatusError> {
