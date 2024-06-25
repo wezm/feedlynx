@@ -5,6 +5,7 @@ use std::io;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::sync::RwLock;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use httpdate::fmt_http_date;
 use log::{debug, error, info, log_enabled, warn};
@@ -96,7 +97,7 @@ impl Server {
 
                             match (modified, if_modified_since) {
                                 // Send 304 response
-                                (Some(modified), Some(ifs)) if modified <= ifs => {
+                                (Some(modified), Some(ifs)) if not_modified(modified, ifs) => {
                                     // https://www.rfc-editor.org/rfc/rfc7232#page-18 suggests Last-Modified should
                                     // still be included in the 304 response
                                     let response =
@@ -297,6 +298,16 @@ impl Server {
     pub fn shutdown(&self) {
         self.server.unblock();
     }
+}
+
+fn not_modified(modified: SystemTime, if_modifed_since: SystemTime) -> bool {
+    let Ok(modified) = modified.duration_since(UNIX_EPOCH) else {
+        return false;
+    };
+    let Ok(if_modified) = if_modifed_since.duration_since(UNIX_EPOCH) else {
+        return false;
+    };
+    modified.as_secs() <= if_modified.as_secs()
 }
 
 impl StatusError {
