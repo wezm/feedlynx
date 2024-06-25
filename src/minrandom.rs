@@ -3,7 +3,6 @@ use std::hash::{BuildHasher, Hasher};
 use std::mem;
 
 pub fn fill_buf(bytes: &mut [u8]) {
-    // let mut getrandom = ;
     bytes
         .chunks_mut(mem::size_of::<u32>())
         .zip(random_numbers(random_seed() as u32).map(|n| n.to_be_bytes()))
@@ -22,7 +21,6 @@ pub fn random_numbers(seed: u32) -> impl Iterator<Item = u32> {
         random ^= random << 5;
         random
     })
-    // (((gen_u32() as u64) << 32) | (gen_u32() as u64)) as usize
 }
 
 pub fn random_seed() -> u64 {

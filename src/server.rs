@@ -161,7 +161,6 @@ impl Server {
         self.validate_request(request)?;
 
         // Get the text field of the form data
-        // FIXME: Limit the size of the body that will be read
         let mut buf = [0; 8 * 1024];
         let mut body = Vec::new();
         let reader = request.as_reader();
@@ -263,11 +262,7 @@ impl Server {
                 .map(|sock| Cow::from(sock.to_string()))
                 .unwrap_or_else(|| Cow::from("-"));
             let user_agent = request.headers().iter().find_map(|header| {
-                if header.field == self.user_agent_field {
-                    Some(header.value.as_str())
-                } else {
-                    None
-                }
+                (header.field == self.user_agent_field).then(|| header.value.as_str())
             });
             debug!(
                 "{} \"{} {}\" {} \"{}\"",

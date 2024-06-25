@@ -2,7 +2,7 @@ use std::{
     env::{self, VarError},
     ffi::OsString,
     path::PathBuf,
-    process::{self, ExitCode},
+    process::ExitCode,
     sync::Arc,
     thread,
 };
@@ -58,7 +58,7 @@ fn main() -> ExitCode {
         match feed.save() {
             Ok(()) => {}
             Err(err) => {
-                eprintln!("FATAL: Unable to save initial feed: {err}");
+                eprintln!("Unable to save initial feed: {err}");
                 return ExitCode::FAILURE;
             }
         }
@@ -67,10 +67,7 @@ fn main() -> ExitCode {
         match Feed::read(&feed_path) {
             Ok(_feed) => {}
             Err(err) => {
-                eprintln!(
-                    "FATAL: Unable to read feed at {}: {err}",
-                    feed_path.display()
-                );
+                eprintln!("Unable to read feed at {}: {err}", feed_path.display());
                 return ExitCode::FAILURE;
             }
         }
@@ -79,7 +76,7 @@ fn main() -> ExitCode {
     let config = match read_config() {
         Ok(config) => config,
         Err(err) => {
-            eprintln!("FATAL: Unable to read configuration: {err}");
+            eprintln!("Unable to read configuration: {err}");
             eprintln!(
                 "{} and {} must both be set to a 32 character string",
                 ENV_PRIVATE_TOKEN, ENV_FEED_TOKEN
@@ -89,12 +86,12 @@ fn main() -> ExitCode {
         }
     };
 
-    // This set the signal mask, which has to happen before the server starts its threads
+    // This sets the signal mask, which has to happen before the server starts its threads
     // so that they inherit the mask
     let signals = match feedlynx::SignalHandle::new() {
         Ok(handle) => handle,
         Err(err) => {
-            eprintln!("FATAL: Unable to set signal mask: {err}");
+            eprintln!("Unable to set signal mask: {err}");
             return ExitCode::FAILURE;
         }
     };
@@ -107,11 +104,11 @@ fn main() -> ExitCode {
     ) {
         Ok(server) => Arc::new(server),
         Err(err) => {
-            error!(
+            eprintln!(
                 "Unable to start http server on {}:{}: {}",
                 config.addr, config.port, err
             );
-            process::exit(1);
+            return ExitCode::FAILURE;
         }
     };
 
