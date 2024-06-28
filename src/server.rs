@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use std::sync::RwLock;
+use std::sync::{OnceLock, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use httpdate::fmt_http_date;
@@ -16,6 +16,7 @@ use crate::feed::Feed;
 use crate::webpage::WebPage;
 use crate::{embed, webpage, FeedToken, PrivateToken};
 
+// HTTP status codes
 const CREATED: u16 = 201;
 const NOT_MODIFIED: u16 = 304;
 const BAD_REQUEST: u16 = 400;
@@ -28,14 +29,22 @@ const INTERNAL_SERVER_ERROR: u16 = 500;
 /// The maximum size in bytes that the server will accept in a POST to /add
 const MAX_POST_BODY: usize = 1_048_576; // 1MiB
 
+// Pre-parsed headers for reading
+static CONTENT_TYPE: OnceLock<HeaderField> = OnceLock::new();
+static HOST: OnceLock<HeaderField> = OnceLock::new();
+static USER_AGENT: OnceLock<HeaderField> = OnceLock::new();
+static LAST_MODIFIED: OnceLock<HeaderField> = OnceLock::new();
+static IF_MODIFIED_SINCE: OnceLock<HeaderField> = OnceLock::new();
+
+// Pre-parsed headers for writing
+static HTML_CONTENT_TYPE: OnceLock<Header> = OnceLock::new();
+static ATOM_CONTENT_TYPE: OnceLock<Header> = OnceLock::new();
+
 pub struct Server {
     server: tiny_http::Server,
     private_token: PrivateToken,
     feed_path: RwLock<PathBuf>,
     feed_route: String,
-    content_type_field: HeaderField,
-    host_field: HeaderField,
-    user_agent_field: HeaderField,
 }
 
 struct StatusError(StatusCode, &'static str);
@@ -55,17 +64,18 @@ impl Server {
             private_token,
             feed_path: RwLock::new(feed_path),
             feed_route: format!("/feed/{}", feed_token.0),
-            content_type_field: "Content-Type".parse().unwrap(),
-            host_field: "Host".parse().unwrap(),
-            user_agent_field: "User-Agent".parse().unwrap(),
         })
     }
 
     pub fn handle_requests(&self) {
-        let html_content_type: Header = "Content-type: text/html; charset=utf-8".parse().unwrap();
-        let atom_content_type: Header = "Content-type: application/atom+xml".parse().unwrap();
-        let last_modified_field: HeaderField = "Last-Modified".parse().unwrap();
-        let if_modified_since_field: HeaderField = "If-Modified-Since".parse().unwrap();
+        // initialize statics
+        let _ = CONTENT_TYPE.set("Content-Type".parse().unwrap());
+        let _ = HOST.set("Host".parse().unwrap());
+        let _ = USER_AGENT.set("User-Agent".parse().unwrap());
+        let _ = LAST_MODIFIED.set("Last-Modified".parse().unwrap());
+        let _ = IF_MODIFIED_SINCE.set("If-Modified-Since".parse().unwrap());
+        let _ = HTML_CONTENT_TYPE.set("Content-type: text/html; charset=utf-8".parse().unwrap());
+        let _ = ATOM_CONTENT_TYPE.set("Content-type: application/atom+xml".parse().unwrap());
 
         info!(
             "Feed available at: http://{}{}",
@@ -77,7 +87,8 @@ impl Server {
             let response = match (request.method(), request.url()) {
                 (Method::Get, "/") => {
                     let body = self.index(&request);
-                    Response::from_string(body).with_header(html_content_type.clone())
+                    Response::from_string(body)
+                        .with_header(HTML_CONTENT_TYPE.get().cloned().unwrap())
                 }
                 // TODO: Handle query args (I.e. ignore them?)
                 // This branch has a different response type so we have to call respond and continue
@@ -90,7 +101,7 @@ impl Server {
                             let if_modified_since = request
                                 .headers()
                                 .iter()
-                                .find(|&header| header.field == if_modified_since_field)
+                                .find(|&header| &header.field == IF_MODIFIED_SINCE.get().unwrap())
                                 .and_then(|header| {
                                     httpdate::parse_http_date(header.value.as_str()).ok()
                                 });
@@ -102,7 +113,7 @@ impl Server {
                                     // still be included in the 304 response
                                     let response =
                                         Response::empty(NOT_MODIFIED).with_header(Header {
-                                            field: last_modified_field.clone(),
+                                            field: LAST_MODIFIED.get().cloned().unwrap(),
                                             // NOTE(unwrap): we always expect ASCII from fmt_http_date
                                             value: fmt_http_date(modified).parse().unwrap(),
                                         });
@@ -117,11 +128,11 @@ impl Server {
                             }
 
                             // Send 200 response with File
-                            let mut response =
-                                Response::from_file(file).with_header(atom_content_type.clone());
+                            let mut response = Response::from_file(file)
+                                .with_header(ATOM_CONTENT_TYPE.get().cloned().unwrap());
                             if let Some(modified) = modified {
                                 response = response.with_header(Header {
-                                    field: last_modified_field.clone(),
+                                    field: LAST_MODIFIED.get().cloned().unwrap(),
                                     // NOTE(unwrap): we always expect ASCII from fmt_http_date
                                     value: fmt_http_date(modified).parse().unwrap(),
                                 });
@@ -147,7 +158,7 @@ impl Server {
                     }
                 },
                 _ => Response::from_string(embed!("404.html"))
-                    .with_header(html_content_type.clone())
+                    .with_header(HTML_CONTENT_TYPE.get().cloned().unwrap())
                     .with_status_code(NOT_FOUND),
             };
 
@@ -166,7 +177,7 @@ impl Server {
             .headers()
             .iter()
             .find_map(|header| {
-                (header.field == self.host_field).then(|| Cow::from(header.value.as_str()))
+                (&header.field == HOST.get().unwrap()).then(|| Cow::from(header.value.as_str()))
             })
             .unwrap_or_else(|| Cow::from(self.server.server_addr().to_string()));
         let feed_url = format!("http://{host}/feed/FEEDLYNX_FEED_TOKEN");
@@ -262,7 +273,7 @@ impl Server {
         let content_type = request
             .headers()
             .iter()
-            .find(|&header| header.field == self.content_type_field)
+            .find(|&header| &header.field == CONTENT_TYPE.get().unwrap())
             .ok_or_else(|| StatusError::new(BAD_REQUEST, "Missing Content-Type"))?;
 
         if content_type.value != "application/x-www-form-urlencoded" {
@@ -282,7 +293,7 @@ impl Server {
                 .map(|sock| Cow::from(sock.to_string()))
                 .unwrap_or_else(|| Cow::from("-"));
             let user_agent = request.headers().iter().find_map(|header| {
-                (header.field == self.user_agent_field).then(|| header.value.as_str())
+                (&header.field == USER_AGENT.get().unwrap()).then(|| header.value.as_str())
             });
             debug!(
                 "{} \"{} {}\" {} \"{}\"",
