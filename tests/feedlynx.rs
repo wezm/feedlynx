@@ -75,6 +75,14 @@ fn server() {
     loop {
         match minreq::get(format!("http://{}/", ADDRESS)).send() {
             Ok(res) => {
+                assert_eq!(res.status_code, 200);
+
+                let content_type = res
+                    .headers
+                    .get("content-type")
+                    .expect("Content-Type header is set");
+                assert_eq!(content_type, "text/html; charset=utf-8");
+
                 let body = res.as_str().unwrap();
                 assert!(body.contains("Feed available at"));
                 break;
@@ -142,6 +150,13 @@ fn fetch_feed() -> (atom::Feed, String) {
         .send()
         .expect("GET /feed failed");
     assert_eq!(res.status_code, 200);
+
+    // Get the Content-Type
+    let content_type = res
+        .headers
+        .get("content-type")
+        .expect("Content-Type header is set");
+    assert_eq!(content_type, "application/atom+xml");
 
     // Get the Last-Modified header
     let last_modified = res
