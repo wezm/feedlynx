@@ -162,7 +162,7 @@ fn fetch_feed() -> (atom::Feed, String) {
     let last_modified = res
         .headers
         .get("last-modified")
-        .expect("Last-Modifed header is set");
+        .expect("Last-Modified header is set");
 
     let xml = res.as_str().unwrap();
     let feed = atom::Feed::read_from(Cursor::new(xml)).expect("failed to parse feed");
