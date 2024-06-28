@@ -108,7 +108,7 @@ impl Feed {
         fs::rename(tmp_path, &self.path).map_err(Error::from)
     }
 
-    /// Generate a new, unique id for this feed accoring to the [tag]
+    /// Generate a new, unique id for this feed according to the [tag]
     /// URI scheme.
     ///
     /// [tag]: http://www.faqs.org/rfcs/rfc4151.html

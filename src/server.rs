@@ -94,7 +94,7 @@ impl Server {
                 // This branch has a different response type so we have to call respond and continue
                 // instead of falling through to the code at the bottom.
                 (Method::Get, path) if path == self.feed_route => {
-                    let feed_path = self.feed_path.read().expect("poisioned");
+                    let feed_path = self.feed_path.read().expect("poisoned");
                     match File::open(&*feed_path) {
                         Ok(file) => {
                             let modified = file.metadata().and_then(|meta| meta.modified()).ok();
@@ -255,7 +255,7 @@ impl Server {
         }
 
         // Add to the feed
-        let feed_path = self.feed_path.write().expect("poisioned");
+        let feed_path = self.feed_path.write().expect("poisoned");
         let mut feed = Feed::read(&*feed_path).map_err(|err| {
             error!("Unable to read feed file: {err}");
             StatusError::new(INTERNAL_SERVER_ERROR, "Unable to read feed file")
@@ -311,17 +311,17 @@ impl Server {
     }
 }
 
-/// Compare mtime and If-Modifed-Since value to determin if content has changed.
+/// Compare mtime and If-Modified-Since value to determine if content has changed.
 ///
 /// The values are compared as seconds since the UNIX epoch because SystemTime
 /// carries seconds and nanoseconds and the nano seconds can cause a direct
-/// comparision to fail. Also it's an opaque type so we can't set the nanoseconds
+/// comparison to fail. Also it's an opaque type so we can't set the nanoseconds
 /// to zero either.
-fn not_modified(modified: SystemTime, if_modifed_since: SystemTime) -> bool {
+fn not_modified(modified: SystemTime, if_modified_since: SystemTime) -> bool {
     let Ok(modified) = modified.duration_since(UNIX_EPOCH) else {
         return false;
     };
-    let Ok(if_modified) = if_modifed_since.duration_since(UNIX_EPOCH) else {
+    let Ok(if_modified) = if_modified_since.duration_since(UNIX_EPOCH) else {
         return false;
     };
     modified.as_secs() <= if_modified.as_secs()

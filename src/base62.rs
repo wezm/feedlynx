@@ -22,7 +22,7 @@ macro_rules! gen {
         #[doc = concat!(" Nanoid with ", stringify!($mod))]
         #[must_use]
         pub fn $mod<const N: usize>() -> String {
-            // TODO: If https://github.com/rust-lang/rust/issues/76560 is stablised this
+            // TODO: If https://github.com/rust-lang/rust/issues/76560 is stabilised this
             // can probably just be an array.
             let mut bytes = vec![0u8; 8 * N / 5];
             let mut id = String::with_capacity(N);
