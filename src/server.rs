@@ -311,6 +311,12 @@ impl Server {
     }
 }
 
+/// Compare mtime and If-Modifed-Since value to determin if content has changed.
+///
+/// The values are compared as seconds since the UNIX epoch because SystemTime
+/// carries seconds and nanoseconds and the nano seconds can cause a direct
+/// comparision to fail. Also it's an opaque type so we can't set the nanoseconds
+/// to zero either.
 fn not_modified(modified: SystemTime, if_modifed_since: SystemTime) -> bool {
     let Ok(modified) = modified.duration_since(UNIX_EPOCH) else {
         return false;
