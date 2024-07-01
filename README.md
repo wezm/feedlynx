@@ -29,6 +29,7 @@ from YouTube then an embed for the video is generated.
 Install
 -------
 
+<!--
 ### Pre-compiled Binary
 
 Pre-compiled binaries are available for a number of platforms:
@@ -40,7 +41,6 @@ Pre-compiled binaries are available for a number of platforms:
 
 Check the [latest release] for download links.
 
-<!--
 ### Package Manager
 
 Feedlynx is packaged in these package managers:
