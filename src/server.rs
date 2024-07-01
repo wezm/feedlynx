@@ -32,13 +32,14 @@ const MAX_POST_BODY: usize = 1_048_576; // 1MiB
 // Pre-parsed headers for reading
 static CONTENT_TYPE: OnceLock<HeaderField> = OnceLock::new();
 static HOST: OnceLock<HeaderField> = OnceLock::new();
-static USER_AGENT: OnceLock<HeaderField> = OnceLock::new();
-static LAST_MODIFIED: OnceLock<HeaderField> = OnceLock::new();
 static IF_MODIFIED_SINCE: OnceLock<HeaderField> = OnceLock::new();
+static LAST_MODIFIED: OnceLock<HeaderField> = OnceLock::new();
+static USER_AGENT: OnceLock<HeaderField> = OnceLock::new();
 
 // Pre-parsed headers for writing
-static HTML_CONTENT_TYPE: OnceLock<Header> = OnceLock::new();
+static ACCESS_CONTROL_ORIGIN_STAR: OnceLock<Header> = OnceLock::new();
 static ATOM_CONTENT_TYPE: OnceLock<Header> = OnceLock::new();
+static HTML_CONTENT_TYPE: OnceLock<Header> = OnceLock::new();
 
 pub struct Server {
     server: tiny_http::Server,
@@ -71,11 +72,13 @@ impl Server {
         // initialize statics
         let _ = CONTENT_TYPE.set("Content-Type".parse().unwrap());
         let _ = HOST.set("Host".parse().unwrap());
-        let _ = USER_AGENT.set("User-Agent".parse().unwrap());
-        let _ = LAST_MODIFIED.set("Last-Modified".parse().unwrap());
         let _ = IF_MODIFIED_SINCE.set("If-Modified-Since".parse().unwrap());
-        let _ = HTML_CONTENT_TYPE.set("Content-type: text/html; charset=utf-8".parse().unwrap());
+        let _ = LAST_MODIFIED.set("Last-Modified".parse().unwrap());
+        let _ = USER_AGENT.set("User-Agent".parse().unwrap());
+
+        let _ = ACCESS_CONTROL_ORIGIN_STAR.set("Access-Control-Allow-Origin: *".parse().unwrap());
         let _ = ATOM_CONTENT_TYPE.set("Content-type: application/atom+xml".parse().unwrap());
+        let _ = HTML_CONTENT_TYPE.set("Content-type: text/html; charset=utf-8".parse().unwrap());
 
         info!(
             "Feed available at: http://{}{}",
@@ -152,9 +155,13 @@ impl Server {
                     }
                 }
                 (Method::Post, "/add") => match self.add(&mut request) {
-                    Ok(()) => Response::from_string("Added\n").with_status_code(CREATED),
+                    Ok(()) => Response::from_string("Added\n")
+                        .with_header(ACCESS_CONTROL_ORIGIN_STAR.get().cloned().unwrap())
+                        .with_status_code(CREATED),
                     Err(StatusError(status, error)) => {
-                        Response::from_string(format!("Failed: {error}\n")).with_status_code(status)
+                        Response::from_string(format!("Failed: {error}\n"))
+                            .with_header(ACCESS_CONTROL_ORIGIN_STAR.get().cloned().unwrap())
+                            .with_status_code(status)
                     }
                 },
                 _ => Response::from_string(embed!("404.html"))
