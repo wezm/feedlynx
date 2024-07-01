@@ -1,8 +1,8 @@
 env:
   PATH: "$HOME/.cargo/bin:$PATH"
   RUST_VERSION: '1.72.1' # Needs to be <= FreeBSD quarterly version
-  #AWS_ACCESS_KEY_ID: TODO
-  #AWS_SECRET_ACCESS_KEY: TODO
+  AWS_ACCESS_KEY_ID: ENCRYPTED[44da4d040f7e219d5394590e9d8e3d684605a50603bfbf50c27a7f1fc1eba7448f09294b75945db653debbbe22f26d26]
+  AWS_SECRET_ACCESS_KEY: ENCRYPTED[216986009641f20db5d35fa6df20de4f4f9bdba934494b6ebe6d50661a559930624a4d79d2a871aa49b6420336eb4cd1]
 
 task:
   name: Build (Debian Linux)
@@ -57,7 +57,7 @@ task:
 task:
   name: Build (Mac OS)
   macos_instance:
-    image: ghcr.io/cirruslabs/macos-sonoma-base:latest
+    image: ghcr.io/cirruslabs/macos-runner:sonoma
   env:
     PATH: "$HOME/.cargo/bin:$HOME/bin:$PATH"
   cargo_cache:
