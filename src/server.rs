@@ -257,8 +257,12 @@ impl Server {
                 WebPage::default()
             }
         };
-        if page.title.is_none() && title.is_some() {
-            page.title = title.map(|cow| cow.into_owned());
+
+        // Use the title supplied in the request if its longer than that fetched from the page.
+        // This aims to handle cases like YouTube where fetching the video URL returns a
+        // Challenge page to prove you aren't a bot with a generic title and description.
+        if let Some(title) = &title {
+            webpage::set_if_longer(&mut page.title, title);
         }
 
         // Add to the feed
