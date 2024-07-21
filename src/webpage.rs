@@ -133,7 +133,7 @@ fn extract_meta_data(
     })
 }
 
-fn set_if_longer(value: &mut Option<String>, candidate: &str) {
+pub(crate) fn set_if_longer(value: &mut Option<String>, candidate: &str) {
     match value {
         Some(existing) if candidate.len() > existing.len() => {
             value.replace(candidate.to_string());
