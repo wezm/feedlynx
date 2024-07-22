@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io;
@@ -10,6 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use httpdate::fmt_http_date;
 use log::{debug, error, info, log_enabled, warn};
 use tiny_http::{Header, HeaderField, Method, Request, Response, StatusCode};
+use tinyjson::JsonValue;
 use uriparse::URI;
 
 use crate::feed::Feed;
@@ -40,6 +42,7 @@ static USER_AGENT: OnceLock<HeaderField> = OnceLock::new();
 static ACCESS_CONTROL_ORIGIN_STAR: OnceLock<Header> = OnceLock::new();
 static ATOM_CONTENT_TYPE: OnceLock<Header> = OnceLock::new();
 static HTML_CONTENT_TYPE: OnceLock<Header> = OnceLock::new();
+static JSON_CONTENT_TYPE: OnceLock<Header> = OnceLock::new();
 
 pub struct Server {
     server: tiny_http::Server,
@@ -79,6 +82,7 @@ impl Server {
         let _ = ACCESS_CONTROL_ORIGIN_STAR.set("Access-Control-Allow-Origin: *".parse().unwrap());
         let _ = ATOM_CONTENT_TYPE.set("Content-type: application/atom+xml".parse().unwrap());
         let _ = HTML_CONTENT_TYPE.set("Content-type: text/html; charset=utf-8".parse().unwrap());
+        let _ = JSON_CONTENT_TYPE.set("Content-type: application/json".parse().unwrap());
 
         info!(
             "Feed available at: http://{}{}",
@@ -164,6 +168,28 @@ impl Server {
                             .with_status_code(status)
                     }
                 },
+                (Method::Post, "/info") => match self.info(&mut request) {
+                    Ok(info) => {
+                        let json = JsonValue::Object(info);
+                        // NOTE(unwrap): io::Error should not happen when writing to a String
+                        Response::from_string(tinyjson::stringify(&json).unwrap())
+                            .with_header(JSON_CONTENT_TYPE.get().cloned().unwrap())
+                            .with_header(ACCESS_CONTROL_ORIGIN_STAR.get().cloned().unwrap())
+                    }
+                    Err(StatusError(status, error)) => {
+                        let map = IntoIterator::into_iter([
+                            ("status".to_string(), JsonValue::from("error".to_string())),
+                            ("message".to_string(), JsonValue::from(error.to_string())),
+                        ])
+                        .collect();
+                        let json = JsonValue::Object(map);
+                        // NOTE(unwrap): io::Error should not happen when writing to a String
+                        Response::from_string(tinyjson::stringify(&json).unwrap())
+                            .with_header(JSON_CONTENT_TYPE.get().cloned().unwrap())
+                            .with_header(ACCESS_CONTROL_ORIGIN_STAR.get().cloned().unwrap())
+                            .with_status_code(status)
+                    }
+                },
                 _ => Response::from_string(embed!("404.html"))
                     .with_header(HTML_CONTENT_TYPE.get().cloned().unwrap())
                     .with_status_code(NOT_FOUND),
@@ -196,34 +222,7 @@ impl Server {
 
     fn add(&self, request: &mut Request) -> Result<(), StatusError> {
         self.validate_request(request)?;
-
-        // Get the text field of the form data
-        let mut buf = [0; 8 * 1024];
-        let mut body = Vec::new();
-        let reader = request.as_reader();
-        loop {
-            match reader.read(&mut buf) {
-                // EOF reached; body successfully read
-                Ok(0) => break,
-                Ok(n) => {
-                    body.extend_from_slice(&buf[..n]);
-                }
-                // Retry
-                Err(ref err) if err.kind() == io::ErrorKind::Interrupted => {}
-                Err(err) => {
-                    error!("Unable to read POST body: {err}");
-                    return Err(StatusError::new(
-                        INTERNAL_SERVER_ERROR,
-                        "Unable to read POST body",
-                    ));
-                }
-            }
-            if body.len() > MAX_POST_BODY {
-                let msg = "POST body exceeded maximum size";
-                error!("{msg}");
-                return Err(StatusError::new(PAYLOAD_TOO_LARGE, msg));
-            }
-        }
+        let body = read_body(request)?;
 
         // Parse the form submission and extract the token and url
         let mut token = None;
@@ -279,6 +278,35 @@ impl Server {
         })
     }
 
+    fn info(&self, request: &mut Request) -> Result<HashMap<String, JsonValue>, StatusError> {
+        self.validate_request(request)?;
+        let body = read_body(request)?;
+
+        // Parse the form submission and extract the token
+        let mut token = None;
+
+        form_urlencoded::parse(&body).for_each(|(key, value)| match &*key {
+            "token" => token = Some(value),
+            _ => {}
+        });
+
+        let token = token.ok_or_else(|| StatusError::new(BAD_REQUEST, "Missing token"))?;
+
+        // Validate token
+        if self.private_token != *token {
+            return Err(StatusError::new(UNAUTHORIZED, "Invalid token"));
+        }
+
+        Ok(IntoIterator::into_iter([
+            ("status".to_string(), JsonValue::from("ok".to_string())),
+            (
+                "version".to_string(),
+                JsonValue::from(env!("CARGO_PKG_VERSION").to_string()),
+            ),
+        ])
+        .collect())
+    }
+
     fn validate_request(&self, request: &Request) -> Result<(), StatusError> {
         // Extract required headers
         let content_type = request
@@ -320,6 +348,37 @@ impl Server {
     pub fn shutdown(&self) {
         self.server.unblock();
     }
+}
+
+fn read_body(request: &mut Request) -> Result<Vec<u8>, StatusError> {
+    let mut buf = [0; 8 * 1024];
+    let mut body = Vec::new();
+    let reader = request.as_reader();
+    loop {
+        match reader.read(&mut buf) {
+            // EOF reached; body successfully read
+            Ok(0) => break,
+            Ok(n) => {
+                body.extend_from_slice(&buf[..n]);
+            }
+            // Retry
+            Err(ref err) if err.kind() == io::ErrorKind::Interrupted => {}
+            Err(err) => {
+                error!("Unable to read POST body: {err}");
+                return Err(StatusError::new(
+                    INTERNAL_SERVER_ERROR,
+                    "Unable to read POST body",
+                ));
+            }
+        }
+        if body.len() > MAX_POST_BODY {
+            let msg = "POST body exceeded maximum size";
+            error!("{msg}");
+            return Err(StatusError::new(PAYLOAD_TOO_LARGE, msg));
+        }
+    }
+
+    Ok(body)
 }
 
 /// Compare mtime and If-Modified-Since value to determine if content has changed.

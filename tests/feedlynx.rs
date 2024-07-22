@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::Cursor,
     path::{Path, PathBuf},
     process::Child,
@@ -10,6 +11,7 @@ use form_urlencoded as form;
 
 use feedlynx::base62::base62;
 use minreq::Request;
+use tinyjson::{JsonParser, JsonValue};
 
 const PRIVATE_TOKEN: &str = "TestTestTestTestTestTestTest1234";
 const FEED_TOKEN: &str = "FeedFeedFeedFeedFeedFeedFeedFeed";
@@ -100,6 +102,30 @@ fn server() {
     // Fetch the feed
     let (feed, _) = fetch_feed();
     assert_eq!(feed.entries().len(), 0);
+
+    // Fetch info from the server
+    let info = get_info();
+    assert!(info.is_object());
+    let obj: &HashMap<_, _> = info.get().unwrap();
+    assert_eq!(obj["status"].get::<String>().unwrap(), "ok");
+    assert_eq!(
+        obj["version"].get::<String>().unwrap(),
+        env!("CARGO_PKG_VERSION")
+    );
+
+    // Fetch info from the server without token
+    let info = get_info_no_token();
+    assert!(info.is_object());
+    let obj: &HashMap<_, _> = info.get().unwrap();
+    assert_eq!(obj["status"].get::<String>().unwrap(), "error");
+    assert_eq!(obj["message"].get::<String>().unwrap(), "Missing token");
+
+    // Fetch info from the server with wrong token
+    let info = get_info_wrong_token();
+    assert!(info.is_object());
+    let obj: &HashMap<_, _> = info.get().unwrap();
+    assert_eq!(obj["status"].get::<String>().unwrap(), "error");
+    assert_eq!(obj["message"].get::<String>().unwrap(), "Invalid token");
 
     // Add a link to the feed and check again
     let url = "http://example.com/";
@@ -200,6 +226,72 @@ fn add_link_wrong_token(url: &str) {
         .send()
         .expect("POST /add with wrong token failed");
     assert_eq!(res.status_code, 401);
+}
+
+fn prepare_get_info(token: &str) -> Request {
+    let body = form::Serializer::new(String::new())
+        .append_pair("token", token)
+        .finish();
+    minreq::post(format!("http://{}/info", ADDRESS)).with_body(body)
+}
+
+fn get_info() -> JsonValue {
+    let res = prepare_get_info(PRIVATE_TOKEN)
+        .with_header("Content-Type", "application/x-www-form-urlencoded")
+        .send()
+        .expect("POST /info failed");
+
+    assert_eq!(res.status_code, 200);
+
+    // Get the Content-Type
+    let content_type = res
+        .headers
+        .get("content-type")
+        .expect("Content-Type header is set");
+    assert_eq!(content_type, "application/json");
+
+    JsonParser::new(res.as_str().unwrap().chars())
+        .parse()
+        .expect("unable to parse info")
+}
+
+fn get_info_wrong_token() -> JsonValue {
+    let res = prepare_get_info("nope-token")
+        .with_header("Content-Type", "application/x-www-form-urlencoded")
+        .send()
+        .expect("POST /info with wrong token failed");
+    assert_eq!(res.status_code, 401);
+
+    // Get the Content-Type
+    let content_type = res
+        .headers
+        .get("content-type")
+        .expect("Content-Type header is set");
+    assert_eq!(content_type, "application/json");
+
+    JsonParser::new(res.as_str().unwrap().chars())
+        .parse()
+        .expect("unable to parse info")
+}
+
+fn get_info_no_token() -> JsonValue {
+    let res = minreq::post(format!("http://{}/info", ADDRESS))
+        .with_body("")
+        .with_header("Content-Type", "application/x-www-form-urlencoded")
+        .send()
+        .expect("POST /info with no token failed");
+    assert_eq!(res.status_code, 400);
+
+    // Get the Content-Type
+    let content_type = res
+        .headers
+        .get("content-type")
+        .expect("Content-Type header is set");
+    assert_eq!(content_type, "application/json");
+
+    JsonParser::new(res.as_str().unwrap().chars())
+        .parse()
+        .expect("unable to parse info")
 }
 
 // https://github.com/MichaelMcDonnell/test_bin/blob/3f6ded86bbc46171e8d092fc592c65fa94abc60b/src/lib.rs
