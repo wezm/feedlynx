@@ -1,6 +1,6 @@
 [package]
 name = "feedlynx"
-version = "0.1.0-pre.3"
+version = "0.1.0-pre.4"
 edition = "2021"
 description = "Collect links to read or watch later in your RSS reader."
 license = "MIT OR Apache-2.0"
