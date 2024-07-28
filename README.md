@@ -29,7 +29,6 @@ from YouTube then an embed for the video is generated.
 Install
 -------
 
-<!--
 ### Pre-compiled Binary
 
 Pre-compiled binaries are available for a number of platforms:
@@ -41,6 +40,8 @@ Pre-compiled binaries are available for a number of platforms:
 
 Check the [latest release] for download links.
 
+<!--
+
 ### Package Manager
 
 Feedlynx is packaged in these package managers:
@@ -49,19 +50,24 @@ Feedlynx is packaged in these package managers:
 * Brew: `feedlynx`
 * Chimera Linux: `feedlynx`
 
-
-### Browser Extension
-
-There is a Firefox browser extension that makes it quick and easy to add new
-links to the Feedlynx feed.
-
-TODO: Update when the extension is written.
-
 -->
 
 ### From Source
 
 See [Build From Source](#build-from-source) below.
+
+Integrations
+------------
+
+### Browser Extensions
+
+See <https://github.com/wezm/feedlynx-ext> for browser extensions.
+
+### Apple Shortcuts (iOS, iPad OS, macOS)
+
+This Shortcut allows you add links to Feedlynx using the system share sheet.
+
+<https://www.icloud.com/shortcuts/2bc22a709551404a93d55aaf6b0615b4>
 
 Usage
 -----
