@@ -13,7 +13,7 @@ categories = ["command-line-utilities", "web-programming"]
 [dependencies]
 atom_syndication = { version = "0.12.3", default-features = false }
 chrono = { version = "0.4.38", default-features = false, features = ["now", "std"] }
-env_logger = { version = "0.11.3", default-features = false, features = ["humantime"]}
+env_logger = { version = "0.11.5", default-features = false, features = ["humantime"]}
 form_urlencoded = "1.2.1"
 html5gum = "0.5.7"
 httpdate = "1.0.3"
