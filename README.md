@@ -63,7 +63,7 @@ Integrations
 
 See <https://github.com/wezm/feedlynx-ext> for browser extensions.
 
-### Apple Shortcuts (iOS, iPad OS, macOS)
+### Apple Shortcuts (iOS, iPadOS, macOS)
 
 This Shortcut allows you add links to Feedlynx using the system share sheet.
 
