@@ -4,8 +4,8 @@
 </h1>
 
 <div align="center">
-  <strong>Feedlynx lets you collect links to read or watch later. It generates
-    an RSS feed of the links you collect. It runs on BSD, Linux, macOS, Windows,
+  <strong>Feedlynx helps you collect links to read or watch later. It generates
+    an RSS feed of the links you collect and runs on BSD, Linux, macOS, Windows,
     and more.</strong>
 </div>
 
