@@ -56,6 +56,19 @@ Feedlynx is packaged in these package managers:
 
 See [Build From Source](#build-from-source) below.
 
+### Using a Container (Docker or Podman)
+
+A Dockerfile is included in the repository. A leightweight container image can be built like this:
+
+    docker build -t feedlynx .
+
+The Container expects the .yml file in /data so we can use a volume mount to have persistent storage:
+
+    docker run -p 8001:8001 -v ./data:/data -e FEEDLYNX_PRIVATE_TOKEN=ExampleExampleExampleExample1234 -e FEEDLYNX_FEED_TOKEN=FeedFeedFeedFeedFeedFeedFeedFeed localhost/feedlynx
+
+The application then can be accessed at localhost port 8001 like it would run without a container.
+If using podman, just replace the usage of the docker command with podman.
+
 Integrations
 ------------
 
