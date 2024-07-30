@@ -315,7 +315,7 @@ impl Server {
             .find(|&header| &header.field == CONTENT_TYPE.get().unwrap())
             .ok_or_else(|| StatusError::new(BAD_REQUEST, "Missing Content-Type"))?;
 
-        if content_type.value != "application/x-www-form-urlencoded" {
+        if !content_type.value.as_str().contains("application/x-www-form-urlencoded") {
             return Err(StatusError::new(
                 UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported media type",
