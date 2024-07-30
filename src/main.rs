@@ -1,16 +1,20 @@
+mod cli;
+
 use std::{
     env::{self, VarError},
     ffi::OsString,
-    path::PathBuf,
     process::ExitCode,
     sync::Arc,
     thread,
 };
 
 use env_logger::Env;
+use feedlynx::{
+    base62::base62, webpage, Feed, FeedToken, PrivateToken, Server, DEFAULT_ADDR, DEFAULT_PORT,
+};
 use log::{error, info, trace};
 
-use feedlynx::{base62::base62, webpage, Feed, FeedToken, PrivateToken, Server};
+use crate::cli::Command;
 
 const ENV_ADDRESS: &str = "FEEDLYNX_ADDRESS";
 const ENV_PORT: &str = "FEEDLYNX_PORT";
@@ -32,22 +36,26 @@ fn main() -> ExitCode {
     }
     env_logger::init_from_env(Env::new().filter(ENV_LOG));
 
-    let mut args = env::args_os().skip(1);
-    let arg = args.next();
+    let cmd = match cli::parse_args() {
+        Ok(cmd) => cmd,
+        Err(err) => {
+            eprintln!("Unable to parse arguments: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
 
-    let feed_path = match arg {
-        Some(arg) if arg == "gen-token" => {
+    let feed_path = match cmd {
+        Command::Serve(feed_path) => feed_path,
+        Command::GenToken => {
             generate_token();
             return ExitCode::SUCCESS;
         }
-        Some(arg) if arg == "fetch" => {
-            fetch_webpage(args.next());
+        Command::Fetch(url) => {
+            fetch_webpage(url);
             return ExitCode::SUCCESS;
         }
-        Some(arg) => PathBuf::from(arg),
-        None => {
-            eprintln!("Usage: {} path/to/feed.xml", env!("CARGO_BIN_NAME"));
-            return ExitCode::FAILURE;
+        Command::Exit(code) => {
+            return code;
         }
     };
 
@@ -140,11 +148,11 @@ fn main() -> ExitCode {
 }
 
 fn read_config() -> Result<Config, String> {
-    let server_addr = env::var(ENV_ADDRESS).unwrap_or_else(|_| String::from("127.0.0.1"));
+    let server_addr = env::var(ENV_ADDRESS).unwrap_or_else(|_| String::from(DEFAULT_ADDR));
     let server_port = env::var(ENV_PORT)
         .ok()
         .and_then(|port| port.parse::<u16>().ok())
-        .unwrap_or(8001);
+        .unwrap_or(DEFAULT_PORT);
 
     let private_token = read_token(ENV_PRIVATE_TOKEN).map(PrivateToken)?;
     let feed_token = read_token(ENV_FEED_TOKEN).map(FeedToken)?;

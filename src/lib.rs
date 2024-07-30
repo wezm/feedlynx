@@ -11,6 +11,9 @@ pub use feed::Feed;
 pub use server::Server;
 pub use signals::SignalHandle;
 
+pub const DEFAULT_ADDR: &str = "127.0.0.1";
+pub const DEFAULT_PORT: u16 = 8001;
+
 #[derive(Debug)]
 pub enum Error {
     Feed(atom_syndication::Error),

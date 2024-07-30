@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 description = "Collect links to read or watch later in your RSS reader."
 license = "MIT OR Apache-2.0"
+authors = [
+    "Wesley Moore <wes@wezm.net>"
+]
 
 homepage = "https://github.com/wezm/feedlynx"
 repository = "https://github.com/wezm/feedlynx"
@@ -20,6 +23,7 @@ httpdate = "1.0.3"
 libc = "0.2.155"
 log = "0.4.22"
 minreq = "2.12.0"
+pico-args = "0.5.0"
 tiny_http = "0.12.0"
 tinyjson = "2.5.1"
 uriparse = "0.6.4"
