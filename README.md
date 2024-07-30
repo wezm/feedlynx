@@ -94,6 +94,12 @@ does not exist it will be created. When the server starts the path on the
 server for the feed is printed. This is what you would use to subscribe to the
 feed in your feed reader.
 
+**Note:** The feed is capped to 50 items, with older items dropped when a new
+item is added. The limit was added to stop the feed growing forever since there
+is no way for Feedlynx to know when an item has been read. RSS readers need to
+download and process the whole feed whenever there are new items, so imposing a
+cap helps limit the size and scope of that work.
+
 ### Example
 
     FEEDLYNX_PRIVATE_TOKEN=ExampleExampleExampleExample1234 \
