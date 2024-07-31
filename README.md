@@ -56,19 +56,6 @@ Feedlynx is packaged in these package managers:
 
 See [Build From Source](#build-from-source) below.
 
-### Using a Container (Docker or Podman)
-
-A Dockerfile is included in the repository. A leightweight container image can be built like this:
-
-    docker build -t feedlynx .
-
-The Container expects the .yml file in /data so we can use a volume mount to have persistent storage:
-
-    docker run -p 8001:8001 -v ./data:/data -e FEEDLYNX_PRIVATE_TOKEN=ExampleExampleExampleExample1234 -e FEEDLYNX_FEED_TOKEN=FeedFeedFeedFeedFeedFeedFeedFeed localhost/feedlynx
-
-The application then can be accessed at localhost port 8001 like it would run without a container.
-If using podman, just replace the usage of the docker command with podman.
-
 Integrations
 ------------
 
@@ -209,6 +196,24 @@ To build with `native-tls` invoke Cargo as follows:
 
 If packaging Feedlynx for an operating system registry it might make sense to
 use `native-tls`. On Linux and BSD systems that adds a dependency on OpenSSL.
+
+### Using a Container (Docker or Podman)
+
+A Dockerfile is included in the repository. A lightweight container image can
+be built like this:
+
+    docker build -t feedlynx .
+
+The container expects the path to the feed in `/data`, so we can use a volume
+mount to have persistent storage:
+
+    docker run -p 127.0.0.1:8001:8001 -v ./data:/data \
+      -e FEEDLYNX_PRIVATE_TOKEN=ExampleExampleExampleExample1234 \
+      -e FEEDLYNX_FEED_TOKEN=FeedFeedFeedFeedFeedFeedFeedFeed /data/feed.xml
+
+The application then can be accessed at <http://localhost:8001> like it would
+run without a container. If using Podman, just replace the usage of the
+`docker` command with `podman`.
 
 Credits
 -------
