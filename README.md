@@ -35,6 +35,7 @@ Pre-compiled binaries are available for a number of platforms:
 
 * FreeBSD 13+ amd64
 * Linux x86\_64
+* Linux aarch64
 * MacOS Universal
 * Windows x86\_64
 
@@ -162,10 +163,16 @@ Feedlynx feed:
          -d 'token=ExampleExampleExampleExample1234' \
          http://localhost:8001/add
 
+Deployment
+----------
+
+It's recommended that Feedlynx be deployed behind a reverse proxy such as nginx
+that can provide HTTPS termination.
+
 Build from Source
 -----------------
 
-**Minimum Supported Rust Version:** 1.72.1
+**Minimum Supported Rust Version:** 1.79.0
 
 Feedlynx is implemented in Rust. See the Rust website for [instructions on
 installing the toolchain][rustup].
