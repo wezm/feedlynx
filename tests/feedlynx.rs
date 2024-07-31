@@ -104,7 +104,17 @@ fn server() {
     assert_eq!(feed.entries().len(), 0);
 
     // Fetch info from the server
-    let info = get_info();
+    let info = get_info(None);
+    assert!(info.is_object());
+    let obj: &HashMap<_, _> = info.get().unwrap();
+    assert_eq!(obj["status"].get::<String>().unwrap(), "ok");
+    assert_eq!(
+        obj["version"].get::<String>().unwrap(),
+        env!("CARGO_PKG_VERSION")
+    );
+
+    // Fetch info from the server with charset
+    let info = get_info(Some("utf-8"));
     assert!(info.is_object());
     let obj: &HashMap<_, _> = info.get().unwrap();
     assert_eq!(obj["status"].get::<String>().unwrap(), "ok");
@@ -160,6 +170,17 @@ fn server() {
         .expect("POST /add with wrong content type failed");
     assert_eq!(res.status_code, 415);
     assert!(res.as_str().unwrap().contains("Unsupported media type"));
+
+    // Check unsupported charset in POST is rejected
+    let res = prepare_add_link(url, PRIVATE_TOKEN)
+        .with_header(
+            "Content-Type",
+            "application/x-www-form-urlencoded; charset=UTF-16",
+        )
+        .send()
+        .expect("POST /add with wrong charset failed");
+    assert_eq!(res.status_code, 415);
+    assert!(res.as_str().unwrap().contains("Unsupported character set"));
 
     // Check that token is required to add link
     add_link_wrong_token(url);
@@ -235,9 +256,15 @@ fn prepare_get_info(token: &str) -> Request {
     minreq::post(format!("http://{}/info", ADDRESS)).with_body(body)
 }
 
-fn get_info() -> JsonValue {
+fn get_info(charset: Option<&str>) -> JsonValue {
+    let mut content_type = "application/x-www-form-urlencoded".to_string();
+    if let Some(charset) = charset {
+        content_type.push_str("; charset=");
+        content_type.push_str(charset);
+    }
+
     let res = prepare_get_info(PRIVATE_TOKEN)
-        .with_header("Content-Type", "application/x-www-form-urlencoded")
+        .with_header("Content-Type", content_type)
         .send()
         .expect("POST /info failed");
 

@@ -10,6 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use httpdate::fmt_http_date;
 use log::{debug, error, info, log_enabled, warn};
+use mime::Mime;
 use tiny_http::{Header, HeaderField, Method, Request, Response, StatusCode};
 use tinyjson::JsonValue;
 use uriparse::URI;
@@ -314,11 +315,27 @@ impl Server {
             .iter()
             .find(|&header| &header.field == CONTENT_TYPE.get().unwrap())
             .ok_or_else(|| StatusError::new(BAD_REQUEST, "Missing Content-Type"))?;
+        let Ok(content_type) = content_type.value.as_str().parse::<Mime>() else {
+            return Err(StatusError::new(
+                UNSUPPORTED_MEDIA_TYPE,
+                "Unable to parse content type",
+            ));
+        };
 
-        if content_type.value != "application/x-www-form-urlencoded" {
+        if content_type.essence_str() != mime::APPLICATION_WWW_FORM_URLENCODED {
             return Err(StatusError::new(
                 UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported media type",
+            ));
+        }
+
+        if content_type
+            .get_param(mime::CHARSET)
+            .map_or(false, |charset| charset != mime::UTF_8)
+        {
+            return Err(StatusError::new(
+                UNSUPPORTED_MEDIA_TYPE,
+                "Unsupported character set",
             ));
         }
 
