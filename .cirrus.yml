@@ -1,11 +1,11 @@
 env:
   PATH: "$HOME/.cargo/bin:$PATH"
-  RUST_VERSION: '1.72.1' # Needs to be <= FreeBSD quarterly version
+  RUST_VERSION: '1.79.0' # Needs to be <= FreeBSD quarterly version
   AWS_ACCESS_KEY_ID: ENCRYPTED[44da4d040f7e219d5394590e9d8e3d684605a50603bfbf50c27a7f1fc1eba7448f09294b75945db653debbbe22f26d26]
   AWS_SECRET_ACCESS_KEY: ENCRYPTED[216986009641f20db5d35fa6df20de4f4f9bdba934494b6ebe6d50661a559930624a4d79d2a871aa49b6420336eb4cd1]
 
 task:
-  name: Build (Debian Linux)
+  name: Build (Debian x86_64)
   container:
     image: debian:12-slim
     cpu: 4
@@ -17,7 +17,7 @@ task:
     - curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain ${RUST_VERSION}
     - rustup target add x86_64-unknown-linux-musl
     - mkdir ~/bin
-    - curl -L https://releases.wezm.net/upload-to-s3/0.2.0/upload-to-s3-0.2.0-x86_64-unknown-linux-musl.tar.gz | tar xzf - -C ~/bin
+    - curl -L https://releases.wezm.net/upload-to-s3/0.3.0/upload-to-s3-0.3.0-x86_64-unknown-linux-musl.tar.gz | tar xzf - -C ~/bin
   test_script:
     - cargo test
   publish_script: |
@@ -31,6 +31,32 @@ task:
     fi
 
 task:
+  name: Build (Debian aarch64)
+  arm_container:
+    image: debian:12-slim
+    cpu: 4
+  cargo_cache:
+    folder: $HOME/.cargo/registry
+    fingerprint_script: cat Cargo.lock
+  install_script:
+    - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl gcc libc6-dev musl-tools
+    - curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain ${RUST_VERSION}
+    - rustup target add aarch64-unknown-linux-musl
+    - mkdir ~/bin
+    - curl -L https://releases.wezm.net/upload-to-s3/0.3.0/upload-to-s3-0.3.0-aarch64-unknown-linux-musl.tar.gz | tar xzf - -C ~/bin
+  test_script:
+    - cargo test
+  publish_script: |
+    tag=$(git describe --exact-match HEAD 2>/dev/null || true)
+    if [ -n "$tag" ]; then
+      cargo build --release --locked --target aarch64-unknown-linux-musl
+      tarball="feedlynx-${tag}-aarch64-unknown-linux-musl.tar.gz"
+      strip target/aarch64-unknown-linux-musl/release/feedlynx
+      tar zcf "$tarball" -C target/aarch64-unknown-linux-musl/release feedlynx
+      ~/bin/upload-to-s3 -b releases.wezm.net "$tarball" "feedlynx/$tag/$tarball"
+    fi
+
+task:
   name: Build (FreeBSD)
   freebsd_instance:
     image_family: freebsd-13-3
@@ -40,7 +66,7 @@ task:
     fingerprint_script: cat Cargo.lock
   install_script:
     - pkg install -y git-lite rust ca_root_nss
-    - fetch -o - https://releases.wezm.net/upload-to-s3/0.2.0/upload-to-s3-0.2.0-amd64-unknown-freebsd.tar.gz | tar xzf - -C /usr/local/bin
+    - fetch -o - https://releases.wezm.net/upload-to-s3/0.3.0/upload-to-s3-0.3.0-amd64-unknown-freebsd.tar.gz | tar xzf - -C /usr/local/bin
   test_script:
     - cargo test
   publish_script: |
@@ -65,7 +91,7 @@ task:
   install_script:
     - curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain ${RUST_VERSION}
     - mkdir ~/bin
-    - curl -L https://releases.wezm.net/upload-to-s3/0.2.0/upload-to-s3-0.2.0-universal-apple-darwin.tar.gz | tar xzf - -C ~/bin
+    - curl -L https://releases.wezm.net/upload-to-s3/0.3.0/upload-to-s3-0.3.0-universal-apple-darwin.tar.gz | tar xzf - -C ~/bin
     - rustup target add x86_64-apple-darwin
   test_script:
     - cargo test
@@ -96,7 +122,7 @@ task:
   install_script:
     - Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
     - .\rustup-init -y --profile minimal --default-toolchain $env:RUST_VERSION
-    - Invoke-WebRequest https://releases.wezm.net/upload-to-s3/0.2.0/upload-to-s3-0.2.0-x86_64-pc-windows-msvc.zip -OutFile upload-to-s3.zip
+    - Invoke-WebRequest https://releases.wezm.net/upload-to-s3/0.3.0/upload-to-s3-0.3.0-x86_64-pc-windows-msvc.zip -OutFile upload-to-s3.zip
     - Expand-Archive upload-to-s3.zip -DestinationPath .
     - git fetch --tags
   test_script: |
