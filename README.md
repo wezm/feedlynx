@@ -73,6 +73,41 @@ This Shortcut allows you add links to Feedlynx using the system share sheet.
 Usage
 -----
 
+```
+USAGE:
+    feedlynx [OPTIONS] FEED_PATH
+
+OPTIONS:
+    -h, --help
+            Prints this help information
+
+    -V, --version
+            Prints version information
+
+ENVIRONMENT:
+
+    Required:
+
+        FEEDLYNX_PRIVATE_TOKEN
+            Used to authenticate requests to add a new link.
+
+        FEEDLYNX_FEED_TOKEN
+            Used in the path to the generated feed.
+
+    Optional:
+
+        FEEDLYNX_ADDRESS
+            The address to serve on, default `127.0.0.1`.
+
+        FEEDLYNX_PORT
+            The port to serve on, default `8001`.
+
+        FEEDLYNX_LOG
+            Controls the log level and filtering.
+```
+
+Example:
+
     feedlynx path/to/feed.xml
 
 Feedlynx requires two environment variables to be set:
