@@ -183,10 +183,18 @@ The server exposes three end-points:
 
 * `GET /` — shows a brief page about the Feedlynx server.
 * `POST /add` —  add a new link. Requires a body in `application/x-www-form-urlencoded` (web form) format.
-  Fields:
-  - `url` (required) — the link to add.
-  - `token` (required) — the value of `FEEDLYNX_PRIVATE_TOKEN`.
-  - `title` (optional) — the title of the link.
+  - Fields:
+    - `url` (required) — the link to add.
+    - `token` (required) — the value of `FEEDLYNX_PRIVATE_TOKEN`.
+    - `title` (optional) — the title of the link.
+* `POST /info` — retrieve informatin about the server. Requires a body in `application/x-www-form-urlencoded` (web form) format.
+  - Fields:
+    - `token` (required) — the value of `FEEDLYNX_PRIVATE_TOKEN`.
+  - Response:
+    - JSON object. Keys:
+      - `status`: `"ok"` or `"error"`.
+      - `version`: present when status is `"ok"`. Contains server version.
+      - `message`: present when status is `"error"`. Contain an error message.
 * `GET /feed/<FEEDLYNX_FEED_TOKEN>` — the generated feed. Use this to subscribe to the feed in your feed reader.
 
 #### cURL Example
