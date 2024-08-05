@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fs,
     io::Cursor,
     path::{Path, PathBuf},
     process::Child,
@@ -15,8 +16,7 @@ use tinyjson::{JsonParser, JsonValue};
 
 const PRIVATE_TOKEN: &str = "TestTestTestTestTestTestTest1234";
 const FEED_TOKEN: &str = "FeedFeedFeedFeedFeedFeedFeedFeed";
-const PORT: &str = "8003"; // Use a different port so it doesn't hit the dev server accidentely
-const ADDRESS: &str = "127.0.0.1:8003";
+const PORT: u16 = 8003; // Use a different port so it doesn't hit the dev server accidentely
 
 struct RmOnDrop(PathBuf);
 
@@ -49,7 +49,7 @@ impl Drop for StopOnDrop {
 #[test]
 fn server() {
     let rand = base62::<8>();
-    let feed_path = std::env::temp_dir().join(format!("feed.{rand}.xml",));
+    let feed_path = std::env::temp_dir().join(format!("feed.{rand}.xml"));
     assert!(!feed_path.exists());
     let feed_path = RmOnDrop::new(feed_path);
 
@@ -58,7 +58,7 @@ fn server() {
         .envs([
             ("FEEDLYNX_PRIVATE_TOKEN", PRIVATE_TOKEN),
             ("FEEDLYNX_FEED_TOKEN", FEED_TOKEN),
-            ("FEEDLYNX_PORT", PORT),
+            ("FEEDLYNX_PORT", &PORT.to_string()),
             ("FEEDLYNX_LOG", "debug"),
         ])
         .arg(feed_path.path());
@@ -72,10 +72,12 @@ fn server() {
         panic!("server failed to start ({})", code)
     }
 
+    let address = format!("127.0.0.1:{}", PORT);
+
     // Ensure the server is up and accepting requests
     let mut attempt = 0;
     loop {
-        match minreq::get(format!("http://{}/", ADDRESS)).send() {
+        match minreq::get(format!("http://{}/", address)).send() {
             Ok(res) => {
                 assert_eq!(res.status_code, 200);
 
@@ -100,11 +102,11 @@ fn server() {
     }
 
     // Fetch the feed
-    let (feed, _) = fetch_feed();
+    let (feed, _) = fetch_feed(&address);
     assert_eq!(feed.entries().len(), 0);
 
     // Fetch info from the server
-    let info = get_info(None);
+    let info = get_info(None, &address);
     assert!(info.is_object());
     let obj: &HashMap<_, _> = info.get().unwrap();
     assert_eq!(obj["status"].get::<String>().unwrap(), "ok");
@@ -114,7 +116,7 @@ fn server() {
     );
 
     // Fetch info from the server with charset
-    let info = get_info(Some("utf-8"));
+    let info = get_info(Some("utf-8"), &address);
     assert!(info.is_object());
     let obj: &HashMap<_, _> = info.get().unwrap();
     assert_eq!(obj["status"].get::<String>().unwrap(), "ok");
@@ -124,14 +126,14 @@ fn server() {
     );
 
     // Fetch info from the server without token
-    let info = get_info_no_token();
+    let info = get_info_no_token(&address);
     assert!(info.is_object());
     let obj: &HashMap<_, _> = info.get().unwrap();
     assert_eq!(obj["status"].get::<String>().unwrap(), "error");
     assert_eq!(obj["message"].get::<String>().unwrap(), "Missing token");
 
     // Fetch info from the server with wrong token
-    let info = get_info_wrong_token();
+    let info = get_info_wrong_token(&address);
     assert!(info.is_object());
     let obj: &HashMap<_, _> = info.get().unwrap();
     assert_eq!(obj["status"].get::<String>().unwrap(), "error");
@@ -139,8 +141,8 @@ fn server() {
 
     // Add a link to the feed and check again
     let url = "http://example.com/";
-    add_link(url);
-    let (feed, last_modified) = fetch_feed();
+    add_link(url, &address);
+    let (feed, last_modified) = fetch_feed(&address);
     assert_eq!(feed.entries().len(), 1);
     assert_eq!(
         feed.entries()
@@ -154,17 +156,17 @@ fn server() {
     );
 
     // Check 304
-    assert_eq!(fetch_feed_conditional(&last_modified), 304);
+    assert_eq!(fetch_feed_conditional(&last_modified, &address), 304);
 
     // Check missing content type in POST is rejected
-    let res = prepare_add_link(url, PRIVATE_TOKEN)
+    let res = prepare_add_link(url, PRIVATE_TOKEN, &address)
         .send()
         .expect("POST /add without content type failed");
     assert_eq!(res.status_code, 400);
     assert!(res.as_str().unwrap().contains("Missing Content-Type"));
 
     // Check wrong content type in POST is rejected
-    let res = prepare_add_link(url, PRIVATE_TOKEN)
+    let res = prepare_add_link(url, PRIVATE_TOKEN, &address)
         .with_header("Content-Type", "application/json")
         .send()
         .expect("POST /add with wrong content type failed");
@@ -172,7 +174,7 @@ fn server() {
     assert!(res.as_str().unwrap().contains("Unsupported media type"));
 
     // Check unsupported charset in POST is rejected
-    let res = prepare_add_link(url, PRIVATE_TOKEN)
+    let res = prepare_add_link(url, PRIVATE_TOKEN, &address)
         .with_header(
             "Content-Type",
             "application/x-www-form-urlencoded; charset=UTF-16",
@@ -183,17 +185,109 @@ fn server() {
     assert!(res.as_str().unwrap().contains("Unsupported character set"));
 
     // Check that token is required to add link
-    add_link_wrong_token(url);
+    add_link_wrong_token(url, &address);
 
     // Check that token is required to fetch feed
-    let res = minreq::get(format!("http://{}/feed/{}", ADDRESS, "invalid-token"))
+    let res = minreq::get(format!("http://{}/feed/{}", address, "invalid-token"))
         .send()
         .expect("GET /feed with invalid token failed");
     assert_eq!(res.status_code, 404);
 }
 
-fn fetch_feed() -> (atom::Feed, String) {
-    let res = minreq::get(format!("http://{}/feed/{}", ADDRESS, FEED_TOKEN))
+#[test]
+fn trim() {
+    let rand = base62::<8>();
+    let feed_path = std::env::temp_dir().join(format!("feed.{rand}.xml"));
+    assert!(!feed_path.exists());
+    let sample_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("sample.xml");
+    fs::copy(sample_path, &feed_path).expect("unable to copy sample feed");
+    let feed_path = RmOnDrop::new(feed_path);
+
+    let mut binary = test_bin::get_test_bin("feedlynx");
+    binary
+        .envs([
+            ("FEEDLYNX_PRIVATE_TOKEN", PRIVATE_TOKEN),
+            ("FEEDLYNX_FEED_TOKEN", FEED_TOKEN),
+            ("FEEDLYNX_PORT", &(PORT + 1).to_string()),
+            ("FEEDLYNX_LOG", "debug"),
+        ])
+        .arg(feed_path.path());
+    let mut child = binary
+        .spawn()
+        .map(StopOnDrop)
+        .expect("failed to spawn server");
+    std::thread::sleep(Duration::from_millis(250));
+    let status = child.0.try_wait().expect("unable to get status");
+    if let Some(code) = status {
+        panic!("server failed to start ({})", code)
+    }
+
+    let address = format!("127.0.0.1:{}", PORT + 1);
+
+    // Ensure the server is up and accepting requests
+    let mut attempt = 0;
+    loop {
+        match minreq::get(format!("http://{}/", address)).send() {
+            Ok(res) => {
+                assert_eq!(res.status_code, 200);
+
+                let content_type = res
+                    .headers
+                    .get("content-type")
+                    .expect("Content-Type header is set");
+                assert_eq!(content_type, "text/html; charset=utf-8");
+
+                let body = res.as_str().unwrap();
+                assert!(body.contains("Feed available at"));
+                break;
+            }
+            Err(err) => {
+                attempt += 1;
+                if attempt > 2 {
+                    panic!("GET / failed: {err}");
+                }
+                std::thread::sleep(Duration::from_secs(1));
+            }
+        }
+    }
+
+    let ids = [
+        "tag:feedlynx.7bit.org,2024:BBPslb1dYm9x1KOz2",
+        "tag:feedlynx.7bit.org,2024:BBPslb1dYm9x1KOz11",
+        "tag:feedlynx.7bit.org,2024:BBPslb1dYm9x1KOz12",
+        "tag:feedlynx.7bit.org,2024:BBPslb1dYm9x1KOz13",
+    ];
+
+    // Before adding a new link check that that items we expect to be removed are present.
+    let (feed, _last_modified) = fetch_feed(&address);
+    assert_eq!(feed.entries().len(), 53);
+    ids.iter().for_each(|&id| {
+        feed.entries()
+            .iter()
+            .find(|entry| entry.id() == id)
+            .expect(&format!("expected to find entry with id: {}", id));
+    });
+
+    // Add a link to the feed, which should trigger trimming, check that the trim worked.
+    let url = "http://example.com/";
+    add_link(url, &address);
+    let (feed, _last_modified) = fetch_feed(&address);
+    assert_eq!(feed.entries().len(), 50);
+
+    // Check that these entries were removed
+    let removed = ids.iter().all(|&id| {
+        feed.entries()
+            .iter()
+            .find(|entry| entry.id() == id)
+            .is_none()
+    });
+    assert!(removed);
+}
+
+fn fetch_feed(address: &str) -> (atom::Feed, String) {
+    let res = minreq::get(format!("http://{}/feed/{}", address, FEED_TOKEN))
         .send()
         .expect("GET /feed failed");
     assert_eq!(res.status_code, 200);
@@ -216,54 +310,54 @@ fn fetch_feed() -> (atom::Feed, String) {
     (feed, last_modified.to_owned())
 }
 
-fn fetch_feed_conditional(last_modified: &str) -> i32 {
+fn fetch_feed_conditional(last_modified: &str, address: &str) -> i32 {
     dbg!(last_modified);
-    let res = minreq::get(format!("http://{}/feed/{}", ADDRESS, FEED_TOKEN))
+    let res = minreq::get(format!("http://{}/feed/{}", address, FEED_TOKEN))
         .with_header("If-Modified-Since", last_modified)
         .send()
         .expect("GET /feed failed");
     res.status_code
 }
 
-fn prepare_add_link(url: &str, token: &str) -> Request {
+fn prepare_add_link(url: &str, token: &str, address: &str) -> Request {
     let body = form::Serializer::new(String::new())
         .append_pair("url", url)
         .append_pair("token", token)
         .finish();
-    minreq::post(format!("http://{}/add", ADDRESS)).with_body(body)
+    minreq::post(format!("http://{}/add", address)).with_body(body)
 }
 
-fn add_link(url: &str) {
-    let res = prepare_add_link(url, PRIVATE_TOKEN)
+fn add_link(url: &str, address: &str) {
+    let res = prepare_add_link(url, PRIVATE_TOKEN, address)
         .with_header("Content-Type", "application/x-www-form-urlencoded")
         .send()
         .expect("POST /add failed");
     assert_eq!(res.status_code, 201);
 }
 
-fn add_link_wrong_token(url: &str) {
-    let res = prepare_add_link(url, "nope-token")
+fn add_link_wrong_token(url: &str, address: &str) {
+    let res = prepare_add_link(url, "nope-token", address)
         .with_header("Content-Type", "application/x-www-form-urlencoded")
         .send()
         .expect("POST /add with wrong token failed");
     assert_eq!(res.status_code, 401);
 }
 
-fn prepare_get_info(token: &str) -> Request {
+fn prepare_get_info(token: &str, address: &str) -> Request {
     let body = form::Serializer::new(String::new())
         .append_pair("token", token)
         .finish();
-    minreq::post(format!("http://{}/info", ADDRESS)).with_body(body)
+    minreq::post(format!("http://{}/info", address)).with_body(body)
 }
 
-fn get_info(charset: Option<&str>) -> JsonValue {
+fn get_info(charset: Option<&str>, address: &str) -> JsonValue {
     let mut content_type = "application/x-www-form-urlencoded".to_string();
     if let Some(charset) = charset {
         content_type.push_str("; charset=");
         content_type.push_str(charset);
     }
 
-    let res = prepare_get_info(PRIVATE_TOKEN)
+    let res = prepare_get_info(PRIVATE_TOKEN, address)
         .with_header("Content-Type", content_type)
         .send()
         .expect("POST /info failed");
@@ -282,8 +376,8 @@ fn get_info(charset: Option<&str>) -> JsonValue {
         .expect("unable to parse info")
 }
 
-fn get_info_wrong_token() -> JsonValue {
-    let res = prepare_get_info("nope-token")
+fn get_info_wrong_token(address: &str) -> JsonValue {
+    let res = prepare_get_info("nope-token", address)
         .with_header("Content-Type", "application/x-www-form-urlencoded")
         .send()
         .expect("POST /info with wrong token failed");
@@ -301,8 +395,8 @@ fn get_info_wrong_token() -> JsonValue {
         .expect("unable to parse info")
 }
 
-fn get_info_no_token() -> JsonValue {
-    let res = minreq::post(format!("http://{}/info", ADDRESS))
+fn get_info_no_token(address: &str) -> JsonValue {
+    let res = minreq::post(format!("http://{}/info", address))
         .with_body("")
         .with_header("Content-Type", "application/x-www-form-urlencoded")
         .send()
