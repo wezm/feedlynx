@@ -11,8 +11,8 @@ use uriparse::URI;
 use crate::webpage::WebPage;
 use crate::{base62, Error};
 
-const MIN_ENTRIES: usize = 50;
-const TRIM_AGE: TimeDelta = TimeDelta::days(30);
+pub const MIN_ENTRIES: usize = 50;
+pub const TRIM_AGE: TimeDelta = TimeDelta::days(30);
 
 pub struct Feed {
     path: PathBuf,
