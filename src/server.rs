@@ -15,7 +15,7 @@ use tiny_http::{Header, HeaderField, Method, Request, Response, StatusCode};
 use tinyjson::JsonValue;
 use uriparse::URI;
 
-use crate::feed::Feed;
+use crate::feed::{self, Feed};
 use crate::webpage::WebPage;
 use crate::{embed, webpage, FeedToken, PrivateToken};
 
@@ -85,6 +85,11 @@ impl Server {
         let _ = HTML_CONTENT_TYPE.set("Content-type: text/html; charset=utf-8".parse().unwrap());
         let _ = JSON_CONTENT_TYPE.set("Content-type: application/json".parse().unwrap());
 
+        info!(
+            "Feed trimming policy: Min entries: {}, trim age: {} days",
+            feed::MIN_ENTRIES,
+            feed::TRIM_AGE.num_days()
+        );
         info!(
             "Feed available at: http://{}{}",
             self.server.server_addr(),
