@@ -68,7 +68,7 @@ See <https://github.com/wezm/feedlynx-ext> for browser extensions.
 
 This Shortcut allows you add links to Feedlynx using the system share sheet.
 
-<https://www.icloud.com/shortcuts/2bc22a709551404a93d55aaf6b0615b4>
+<https://www.icloud.com/shortcuts/1629cde707ca432ead72403ffd9f4dbc>
 
 Usage
 -----
