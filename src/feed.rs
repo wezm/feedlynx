@@ -1,17 +1,18 @@
-use std::fs;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::{borrow::Cow, fs::File};
+use std::{fs, mem};
 
-use atom_syndication::{self as atom, Generator};
-use chrono::{DateTime, Utc};
+use atom_syndication::{self as atom, Entry, Generator};
+use chrono::{DateTime, TimeDelta, Utc};
 use log::{info, trace};
 use uriparse::URI;
 
 use crate::webpage::WebPage;
 use crate::{base62, Error};
 
-const MAX_ENTRIES: usize = 50;
+const MIN_ENTRIES: usize = 50;
+const TRIM_AGE: TimeDelta = TimeDelta::days(30);
 
 pub struct Feed {
     path: PathBuf,
@@ -79,15 +80,9 @@ impl Feed {
         self.feed.set_updated(now);
     }
 
-    /// Ensure there's no more than MAX_ENTRIES entries in the feed
+    /// Trim entries older than `trim_age`, but keep `min_entries`.
     pub fn trim_entries(&mut self) {
-        if self.feed.entries().len() <= MAX_ENTRIES {
-            return;
-        }
-
-        let offset = self.feed.entries().len() - MAX_ENTRIES;
-        let keep = self.feed.entries.split_off(offset);
-        self.feed.entries = keep;
+        trim_entries(&mut self.feed.entries, MIN_ENTRIES, TRIM_AGE);
     }
 
     pub fn save(&self) -> Result<(), Error> {
@@ -140,6 +135,38 @@ impl Feed {
         };
         self.feed.set_generator(generator);
     }
+}
+
+fn trim_entries(entries: &mut Vec<Entry>, min_entries: usize, trim_age: TimeDelta) {
+    if entries.len() <= min_entries {
+        return;
+    }
+
+    // Sort by age (oldest first) so that old items are dropped first.
+    // This is not really necessary since the entries should be in this order already,
+    // but we'll be sure.
+    entries.sort_by(|a, b| a.updated().cmp(b.updated()));
+
+    let now: DateTime<Utc> = Utc::now();
+    let mut num_trim = entries.len() - min_entries;
+    let new_entries = mem::take(entries);
+    *entries = new_entries
+        .into_iter()
+        .filter(|entry| {
+            if num_trim == 0 {
+                return true;
+            }
+
+            let age = now - <DateTime<Utc>>::from(*entry.updated());
+            if age > trim_age {
+                info!("Trim entry {}: {}", entry.id(), entry.title().as_str());
+                num_trim -= 1;
+                false
+            } else {
+                true
+            }
+        })
+        .collect();
 }
 
 fn summary_for_url(url: &URI, description: Option<String>) -> atom::Text {
@@ -217,7 +244,23 @@ fn unique_tag_id() -> String {
 
 #[cfg(test)]
 mod tests {
+    use chrono::FixedOffset;
+
     use super::*;
+
+    fn test_entry(title: atom::Text, updated: DateTime<FixedOffset>) -> Entry {
+        atom::Entry {
+            title,
+            id: unique_tag_id(),
+            updated,
+            summary: Some("Summary".into()),
+            authors: vec![atom::Person {
+                name: "Author".to_string(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn test_video_id_direct() {
@@ -253,5 +296,72 @@ mod tests {
             URI::try_from("https://www.youtube.com/channel/UCLi0H57HGGpAdCkVOb_ykVg").unwrap();
         assert!(is_youtube(&url));
         assert_eq!(youtube_video_id(&url), None);
+    }
+
+    // entry is old enough to be trimmed, but is retained because there's less than
+    // min entries present.
+    #[test]
+    fn test_trim_less_than_min() {
+        let now = Utc::now();
+        let updated = (now - TimeDelta::seconds(5)).into();
+        let entry = test_entry("Test".into(), updated);
+        let mut entries = vec![entry];
+        trim_entries(&mut entries, 3, TimeDelta::seconds(1));
+        assert_eq!(entries.len(), 1);
+    }
+
+    // There's more than min entries items present, but they're all younger
+    // than trim age.
+    #[test]
+    fn text_trim_young() {
+        let now = Utc::now();
+        let updated = (now - TimeDelta::seconds(5)).into();
+        let entry = test_entry("Test".into(), updated);
+        let mut entries = vec![entry; 3];
+        trim_entries(&mut entries, 2, TimeDelta::seconds(10));
+        assert_eq!(entries.len(), 3);
+    }
+
+    // There's more than min entries items present but only one is old enough
+    // to trim.
+    #[test]
+    fn test_trim_one_old() {
+        let now = Utc::now();
+        let entry = test_entry("Test".into(), (now - TimeDelta::seconds(5)).into());
+        let mut entries = vec![entry; 3];
+        let entry = test_entry("Old".into(), (now - TimeDelta::seconds(15)).into());
+        entries.push(entry);
+        trim_entries(&mut entries, 2, TimeDelta::seconds(10));
+        assert_eq!(entries.len(), 3);
+    }
+
+    // There's more than min entries items present and all are old enough
+    // to trim. Only enough to drop to min entries should be dropped. Oldest
+    // items should be dropped.
+    #[test]
+    fn test_trim_all_old() {
+        let now = Utc::now();
+        // - Test 1: 11 secs
+        // - Test 2: 12 secs
+        // - Test 3: 13 secs
+        // - Test 4: 14 secs
+        // Normally entries would not be ordered like this since new items are appended to the end,
+        // which means they'll be ordered oldest to newest.
+        let mut entries = (0..4)
+            .map(|i| {
+                test_entry(
+                    format!("Test {}", i + 1).into(),
+                    (now - TimeDelta::seconds(11 + i)).into(),
+                )
+            })
+            .collect::<Vec<_>>();
+        trim_entries(&mut entries, 2, TimeDelta::seconds(10));
+        let titles = entries
+            .iter()
+            .map(|entry| entry.title().as_str())
+            .collect::<Vec<_>>();
+
+        // 1 and 2 should be retained as they are the youngest.
+        assert_eq!(titles, ["Test 2", "Test 1"]);
     }
 }
