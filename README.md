@@ -215,7 +215,8 @@ Deployment
 ----------
 
 It's recommended that Feedlynx be deployed behind a reverse proxy such as nginx
-that can provide HTTPS termination.
+that can provide HTTPS termination. Feedlynx assumes that it is deployed to a
+dedicated domain or sub-domain. E.g. `https://feedlynx.example.com/`.
 
 Build from Source
 -----------------
