@@ -13,6 +13,13 @@ FROM alpine:3.20
 
 ENV FEEDLYNX_ADDRESS=0.0.0.0
 
+HEALTHCHECK --interval=5m --timeout=3s --start-period=5s --retries=3 \
+    CMD wget -q \
+    --header 'Content-Type: application/x-www-form-urlencoded' \
+    --post-data "token=$FEEDLYNX_PRIVATE_TOKEN" \
+    -O - \
+    "${FEEDLYNX_ADDRESS}:${FEEDLYNX_PORT:-8001}/info" | grep -q '"status":"ok"' || exit 1
+
 RUN mkdir -p /data
 
 #RUN apt-get update & apt-get install -y extra-runtime-dependencies & rm -rf /var/lib/apt/lists/*
