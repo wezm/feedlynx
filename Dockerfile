@@ -22,8 +22,6 @@ HEALTHCHECK --interval=5m --timeout=3s --start-period=5s --retries=3 \
 
 RUN mkdir -p /data
 
-#RUN apt-get update & apt-get install -y extra-runtime-dependencies & rm -rf /var/lib/apt/lists/*
-
 COPY --from=builder /usr/src/feedlynx/target/release/feedlynx /usr/local/bin/feedlynx
 
 VOLUME ["/data"]
