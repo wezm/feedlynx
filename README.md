@@ -70,6 +70,12 @@ This Shortcut allows you add links to Feedlynx using the system share sheet.
 
 <https://www.icloud.com/shortcuts/1629cde707ca432ead72403ffd9f4dbc>
 
+### Android
+
+Using the open-source [HTTP Request Shortcuts app][http-shortcuts] you can
+create a shortcut that posts to Feedlynx, and can be invoked from the
+share sheet. See the [Android Integration wiki page][android] for details.
+
 Usage
 -----
 
@@ -294,9 +300,11 @@ This project is dual licenced under either of:
 
 at your option.
 
+[android]: https://github.com/wezm/feedlynx/wiki/Android-Integration
 [ctrlc]: https://github.com/Detegr/rust-ctrlc/blob/b543abe6c25bd54754bbbbcfcff566e046f8e609/src/platform/windows/mod.rs
 [env_logger]: https://docs.rs/env_logger/0.11.3/env_logger/index.html
 [habitat]: https://github.com/habitat-sh/habitat/blob/631af77f7705fb4ea68a5464f269e0c0b9283a91/components/core/src/os/signals/unix.rs
+[http-shortcuts]: https://http-shortcuts.rmy.ch/
 [latest release]: https://github.com/wezm/feedlynx/releases/latest
 [matklad]: https://github.com/matklad/config/blob/b8ea0aad0f86d4575651a390a3c7aefb63229774/templates/snippets/src/lib.rs#L28L42
 [nano-id]: https://github.com/viz-rs/nano-id/blob/a9022772b2f1ce38929b5b81eccc670ac9d3ab23/src/lib.rs
