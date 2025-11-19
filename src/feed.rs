@@ -19,6 +19,11 @@ pub struct Feed {
     feed: atom_syndication::Feed,
 }
 
+pub enum AddResult {
+    Added,
+    Duplicate,
+}
+
 impl Feed {
     pub fn read<P: Into<PathBuf>>(path: P) -> Result<Feed, Error> {
         let path = path.into();
@@ -47,7 +52,23 @@ impl Feed {
         feed
     }
 
-    pub fn add_url(&mut self, url: &URI, page: WebPage) {
+    pub fn add_url_if_new(&mut self, url: &URI, page: WebPage) -> AddResult {
+        let url_str = url.to_string();
+        let duplicate = self
+            .feed
+            .entries()
+            .iter()
+            .any(|entry| entry.links().iter().any(|link| link.href() == &url_str));
+
+        if duplicate {
+            AddResult::Duplicate
+        } else {
+            self.add_url(url, page);
+            AddResult::Added
+        }
+    }
+
+    fn add_url(&mut self, url: &URI, page: WebPage) {
         info!("Add {}", url);
         let now: DateTime<Utc> = Utc::now();
 
