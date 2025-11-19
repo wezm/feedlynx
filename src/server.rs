@@ -15,7 +15,7 @@ use tiny_http::{Header, HeaderField, Method, Request, Response, StatusCode};
 use tinyjson::JsonValue;
 use uriparse::URI;
 
-use crate::feed::{self, Feed};
+use crate::feed::{self, AddResult, Feed};
 use crate::webpage::WebPage;
 use crate::{embed, webpage, FeedToken, PrivateToken};
 
@@ -165,7 +165,10 @@ impl Server {
                     }
                 }
                 (Method::Post, "/add") => match self.add(&mut request) {
-                    Ok(()) => Response::from_string("Added\n")
+                    Ok(AddResult::Added) => Response::from_string("Added\n")
+                        .with_header(ACCESS_CONTROL_ORIGIN_STAR.get().cloned().unwrap())
+                        .with_status_code(CREATED),
+                    Ok(AddResult::Duplicate) => Response::from_string("Duplicate\n")
                         .with_header(ACCESS_CONTROL_ORIGIN_STAR.get().cloned().unwrap())
                         .with_status_code(CREATED),
                     Err(StatusError(status, error)) => {
@@ -226,7 +229,7 @@ impl Server {
             .replace("{{feed}}", &feed_url)
     }
 
-    fn add(&self, request: &mut Request) -> Result<(), StatusError> {
+    fn add(&self, request: &mut Request) -> Result<AddResult, StatusError> {
         self.validate_request(request)?;
         let body = read_body(request)?;
 
@@ -276,12 +279,17 @@ impl Server {
             error!("Unable to read feed file: {err}");
             StatusError::new(INTERNAL_SERVER_ERROR, "Unable to read feed file")
         })?;
-        feed.add_url(&url, page);
-        feed.trim_entries();
-        feed.save().map_err(|err| {
-            error!("Unable to save feed: {err}");
-            StatusError::new(INTERNAL_SERVER_ERROR, "Error saving feed file")
-        })
+
+        match feed.add_url_if_new(&url, page) {
+            AddResult::Duplicate => Ok(AddResult::Duplicate),
+            AddResult::Added => {
+                feed.trim_entries();
+                feed.save().map(|()| AddResult::Added).map_err(|err| {
+                    error!("Unable to save feed: {err}");
+                    StatusError::new(INTERNAL_SERVER_ERROR, "Error saving feed file")
+                })
+            }
+        }
     }
 
     fn info(&self, request: &mut Request) -> Result<HashMap<String, JsonValue>, StatusError> {
