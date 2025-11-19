@@ -142,7 +142,7 @@ fn server() {
     // Add a link to the feed and check again
     let url = "http://example.com/";
     add_link(url, &address);
-    let (feed, last_modified) = fetch_feed(&address);
+    let (feed, _last_modified) = fetch_feed(&address);
     assert_eq!(feed.entries().len(), 1);
     assert_eq!(
         feed.entries()
@@ -154,6 +154,16 @@ fn server() {
             .href(),
         url
     );
+
+    // Add a duplicate link to the feed and check it is not added
+    let url = "http://example.com/";
+    let body = add_link(url, &address);
+    let (feed, last_modified) = fetch_feed(&address);
+    assert_eq!(feed.entries().len(), 1);
+    assert!(body.contains("Duplicate"));
+
+    // Check 304
+    assert_eq!(fetch_feed_conditional(&last_modified, &address), 304);
 
     // Check 304
     assert_eq!(fetch_feed_conditional(&last_modified, &address), 304);
@@ -327,12 +337,15 @@ fn prepare_add_link(url: &str, token: &str, address: &str) -> Request {
     minreq::post(format!("http://{}/add", address)).with_body(body)
 }
 
-fn add_link(url: &str, address: &str) {
+fn add_link(url: &str, address: &str) -> String {
     let res = prepare_add_link(url, PRIVATE_TOKEN, address)
         .with_header("Content-Type", "application/x-www-form-urlencoded")
         .send()
         .expect("POST /add failed");
     assert_eq!(res.status_code, 201);
+    res.as_str()
+        .expect("unable to get body as string")
+        .to_string()
 }
 
 fn add_link_wrong_token(url: &str, address: &str) {
