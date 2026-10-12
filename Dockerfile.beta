@@ -1,0 +1,17 @@
+FROM docker.io/debian:stable
+
+RUN apt update && apt upgrade -y && apt install -y --no-install-recommends curl build-essential ca-certificates adduser
+
+RUN addgroup --gid 1000 rust && \
+    adduser --uid 1000 --ingroup rust --home /home/rust --disabled-password --gecos 'Rust,,,' rust
+
+WORKDIR /home/rust
+
+USER rust
+
+RUN curl --proto '=https' --tlsv1.2 -sSfo rustup.sh https://sh.rustup.rs && \
+    sh rustup.sh -y --default-toolchain beta --profile minimal
+
+RUN ls -ld /home/rust/.cargo
+
+ENTRYPOINT ["env", "PATH=/home/rust/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "cargo"]
