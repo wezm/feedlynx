@@ -12,6 +12,7 @@ homepage = "https://github.com/wezm/feedlynx"
 repository = "https://github.com/wezm/feedlynx"
 keywords = ["rss", "cli", "feed", "atom"]
 categories = ["command-line-utilities", "web-programming"]
+rust-version = "1.79.0"
 
 [dependencies]
 atom_syndication = { version = "0.12.3", default-features = false }
